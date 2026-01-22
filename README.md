@@ -4,6 +4,39 @@ A PDF reader for macOS with highlighting, notes, and English-to-Chinese translat
 
 ![Reader Screenshot](screenshot.png)
 
+## Technical Highlights
+
+### Translation with Domain-Specific Glossary
+
+The app uses Apple's Translation framework (macOS 15.0+) with a two-stage glossary system:
+
+- **Built-in glossary**: ~400 ML/AI/Math/CS terms with correct Chinese translations (e.g., "transformer" → "Transformer" not "变压器", "gradient descent" → "梯度下降")
+- **Custom glossary**: Users can add their own term mappings, stored in UserDefaults
+- **Mistranslation correction**: Common wrong translations are detected and replaced (e.g., "token" often becomes "令牌" instead of "词元")
+
+Translation flow:
+1. Custom terms are replaced with placeholders before translation
+2. Apple Translation API processes the text
+3. Placeholders are restored with correct Chinese
+4. Built-in mistranslation corrections are applied
+
+### Multi-line Highlight Grouping
+
+PDF highlight annotations are rectangular, so multi-line selections need special handling:
+
+- Each line becomes a separate PDF annotation
+- All annotations share a Group ID (stored in `/PreviewNotesGroupID` annotation key)
+- The sidebar shows one note entry for the entire selection
+- Deleting removes all linked annotations together
+
+### Architecture
+
+- SwiftUI views with `NSViewRepresentable` wrapping PDFKit's `PDFView`
+- MVVM with `NotesViewModel` managing document state
+- Annotations stored directly in PDF files (standard format, compatible with other readers)
+- 30-second autosave with `NSFileCoordinator` for safe writes
+- Security-scoped resource access for sandboxed file operations
+
 ## What It Does
 
 - Open and read PDF files
