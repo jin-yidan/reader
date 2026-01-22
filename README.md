@@ -4,6 +4,8 @@ A PDF reader for macOS with highlighting, notes, and English-to-Chinese translat
 
 ![Reader Screenshot](screenshot.png)
 
+做这个主要是因为苹果原生的 Preview 真的太难用了，想随手批注几句话都要找半天。吐槽归吐槽，还是很喜欢它那种简洁的风格和整体体验。可能这就是差生文具多吧:P
+
 ## Technical Highlights
 
 ### Translation with Domain-Specific Glossary
