@@ -1,61 +1,61 @@
 {
   "images" : [
     {
-      "filename" : "laugh-svgrepo-com 5.png",
+      "filename" : "icon_16.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "16x16"
     },
     {
-      "filename" : "laugh-svgrepo-com 4.png",
+      "filename" : "icon_32.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "16x16"
     },
     {
-      "filename" : "laugh-svgrepo-com 3.png",
+      "filename" : "icon_32.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "32x32"
     },
     {
-      "filename" : "laugh-svgrepo-com 2.png",
+      "filename" : "icon_64.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "32x32"
     },
     {
-      "filename" : "laugh-svgrepo-com 6.png",
+      "filename" : "icon_128.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "128x128"
     },
     {
-      "filename" : "laugh-svgrepo-com 7.png",
+      "filename" : "icon_256.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "128x128"
     },
     {
-      "filename" : "laugh-svgrepo-com.png",
+      "filename" : "icon_256.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "256x256"
     },
     {
-      "filename" : "laugh-svgrepo-com 1.png",
+      "filename" : "icon_512.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "256x256"
     },
     {
-      "filename" : "laugh-svgrepo-com 9.png",
+      "filename" : "icon_512.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "512x512"
     },
     {
-      "filename" : "laugh-svgrepo-com 8.png",
+      "filename" : "icon_1024.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "512x512"

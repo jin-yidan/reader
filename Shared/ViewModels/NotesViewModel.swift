@@ -116,8 +116,8 @@ public class NotesViewModel: ObservableObject {
     // MARK: - Autosave
     
     private func setupAutosave() {
-        // Autosave every 30 seconds if there are unsaved changes
-        autosaveTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
+        // Autosave every 5 seconds if there are unsaved changes
+        autosaveTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.autosave()
             }

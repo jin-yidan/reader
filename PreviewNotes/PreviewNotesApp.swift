@@ -7,6 +7,11 @@ struct ReaderApp: App {
     var body: some Scene {
         WindowGroup {
             MainContentView(tabsViewModel: tabsViewModel)
+                .onOpenURL { url in
+                    Task { @MainActor in
+                        await tabsViewModel.openDocument(from: url)
+                    }
+                }
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)

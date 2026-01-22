@@ -155,7 +155,7 @@ public struct NotesSidebarView: View {
 
             Spacer()
 
-            Text("\(viewModel.notesCount) notes · \(viewModel.highlightCount) highlights")
+            Text("\(viewModel.notesCount) notes")
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
         }
