@@ -1,5 +1,6 @@
 # 「明天读」Reader
 ### 我明天一定会读的:P
+### 再也不能以preview不好用的理由不读paper了。
 
 A PDF reader for macOS with highlighting, notes, and English-to-Chinese translation.
 
