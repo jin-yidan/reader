@@ -13,10 +13,9 @@ A PDF reader for macOS with highlighting, notes, and English-to-Chinese translat
 
 ### Installation
 
-1. Download `明天读.dmg`
-2. Open the DMG file
-3. Drag "明天读" to the Applications folder
-4. **First launch:** Go to System Settings → Privacy & Security → Security → Click "Open Anyway" next to "明天读"
+1. Download `明天读.zip`
+2. Unzip and run the app
+3. **First launch:** Go to System Settings → Privacy & Security → Security → Click "Open Anyway" next to "明天读"
 
 After the first launch, you can open it normally.
 
