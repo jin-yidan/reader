@@ -1,4 +1,4 @@
-# 明天读Reader
+# 「明天读」Reader
 ### 我明天一定会读的:P
 
 A PDF reader for macOS with highlighting, notes, and English-to-Chinese translation.
