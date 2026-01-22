@@ -2,6 +2,8 @@
 
 A PDF reader for macOS with highlighting, notes, and English-to-Chinese translation.
 
+![Reader Screenshot](screenshot.png)
+
 ## What It Does
 
 - Open and read PDF files
