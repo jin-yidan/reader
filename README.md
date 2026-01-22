@@ -7,6 +7,18 @@ A PDF reader for macOS with highlighting, notes, and English-to-Chinese translat
 
 做这个主要是因为苹果原生的 Preview 真的太难用了，想随手批注几句话都要找半天。吐槽归吐槽，还是很喜欢它那种简洁的风格和整体体验。可能这就是差生文具多吧:P
 
+## Download
+
+[Download the latest release](../../releases/latest)
+
+### Installation
+
+1. Download `明天读.dmg`
+2. Open the DMG file
+3. Drag "明天读" to the Applications folder
+4. **First launch:** Right-click the app → "Open" → "Open" (required for unsigned apps)
+
+After the first launch, you can open it normally.
 
 ## Technical Highlights
 
