@@ -375,6 +375,7 @@ struct MainContentView: View {
 struct SidebarResizeHandle: View {
     @Binding var width: CGFloat
     @State private var isDragging = false
+    @State private var dragStartWidth: CGFloat = 0
 
     private let minWidth: CGFloat = 250
     private let maxWidth: CGFloat = 500
@@ -387,9 +388,12 @@ struct SidebarResizeHandle: View {
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
-                        isDragging = true
+                        if !isDragging {
+                            isDragging = true
+                            dragStartWidth = width
+                        }
                         // Dragging left increases width (sidebar is on the right)
-                        let newWidth = width - value.translation.width
+                        let newWidth = dragStartWidth - value.translation.width
                         width = min(max(newWidth, minWidth), maxWidth)
                     }
                     .onEnded { _ in
