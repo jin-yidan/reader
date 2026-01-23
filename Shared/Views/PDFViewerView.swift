@@ -222,22 +222,29 @@ class HighlightablePDFView: PDFView {
         // Get selection by line to handle multi-line selections properly
         let selectionsByLine = selection.selectionsByLine()
 
-        // Collect all highlight bounds for multi-line
+        // Collect all highlight bounds and extract text from each line's bounds
         var highlights: [(page: PDFPage, bounds: CGRect)] = []
+        var combinedText = ""
 
         for lineSelection in selectionsByLine {
             guard let page = lineSelection.pages.first else { continue }
             let bounds = lineSelection.bounds(for: page)
-            let lineText = lineSelection.string ?? ""
+
+            // Extract text from bounds (same method used when loading from file)
+            let lineText = page.selection(for: bounds)?.string ?? lineSelection.string ?? ""
 
             if !lineText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 highlights.append((page: page, bounds: bounds))
+                if !combinedText.isEmpty {
+                    combinedText += " "
+                }
+                combinedText += lineText
             }
         }
 
-        // Call with combined text, highlight bounds, and the selected color
+        // Call with combined text extracted from bounds (consistent with file reload)
         if !highlights.isEmpty {
-            onMultiLineHighlight?(highlights, selectedText, color)
+            onMultiLineHighlight?(highlights, combinedText.isEmpty ? selectedText : combinedText, color)
         }
 
         clearSelection()
