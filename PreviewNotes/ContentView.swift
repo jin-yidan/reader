@@ -83,7 +83,7 @@ struct MainContentView: View {
         }
         .onChange(of: tabsViewModel.activeTabId) { _ in
             // Reset state when switching tabs
-            pdfViewRef.pdfView = nil
+            // Note: Don't nil out pdfViewRef here - let updateNSView handle the reference
             clearSearch()
             syncZoomFromViewModel()
         }
