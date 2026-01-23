@@ -9,7 +9,7 @@ A PDF reader for macOS with highlighting, notes, and English-to-Chinese translat
 
 做这个主要是因为苹果原生的 Preview 真的太难用了，想随手批注几句话都要找半天。吐槽归吐槽，还是很喜欢它那种简洁的风格和整体体验。可能这就是差生文具多吧:P
 
-中文版使用指南：
+[中文版使用指南](https://github.com/jin-yidan/reader/blob/main/README_CN.md)
 
 ## Download
 
