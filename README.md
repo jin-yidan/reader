@@ -1,15 +1,31 @@
 # 「明天读」Read It Tomorrow
-### 我明天一定会读的:P
-### 再也不能以preview不好用的理由不读paper了。
 
-A PDF reader for macOS with highlighting, notes, and English-to-Chinese translation.
+**A lightweight PDF reader for reading academic papers on macOS.**
 
 ![Reader Screenshot](screenshot.png)
 
+Highlight & annotate with one right-click — no more digging through menus.
+Translate English to Chinese with 400+ ML/AI/Math terms built-in.
+Open multiple papers in tabs, just like a browser.
 
-做这个主要是因为苹果原生的 Preview 真的太难用了，想随手批注几句话都要找半天。吐槽归吐槽，还是很喜欢它那种简洁的风格和整体体验。可能这就是差生文具多吧:P
+[中文版](README_CN.md)
 
-[中文版使用指南](https://github.com/jin-yidan/reader/blob/main/README_CN.md)
+## Why This Over Preview?
+
+| Feature | Preview | 明天读 |
+|---------|---------|--------|
+| Quick highlight | Hidden in menus | Right-click |
+| Multi-color highlights | Limited | 5 colors |
+| Translation | No | Built-in EN→CN |
+| ML/AI term glossary | No | 400+ terms |
+| Multi-tab | No | Yes |
+| Auto-save | No | Every 30 seconds |
+
+## Perfect For
+
+- Researchers reading English papers
+- Students studying ML/AI/CS
+- Anyone tired of Preview's annotation UX
 
 ## Download
 
@@ -17,129 +33,47 @@ A PDF reader for macOS with highlighting, notes, and English-to-Chinese translat
 
 ### Installation
 
-1. Download `明天读.zip`
+1. Download `Reader.zip`
 2. Unzip and run the app
-3. **First launch:** Go to System Settings → Privacy & Security → Security → Click "Open Anyway" next to "明天读"
-
-After the first launch, you can open it normally.
-
-## Technical Highlights
-
-### Translation with Domain-Specific Glossary
-
-The app uses Apple's Translation framework (macOS 15.0+) with a two-stage glossary system:
-
-- **Built-in glossary**: ~400 ML/AI/Math/CS terms with correct Chinese translations (e.g., "transformer" → "Transformer" not "变压器", "gradient descent" → "梯度下降")
-- **Custom glossary**: Users can add their own term mappings, stored in UserDefaults
-- **Mistranslation correction**: Common wrong translations are detected and replaced (e.g., "token" often becomes "令牌" instead of "词元")
-
-Translation flow:
-1. Custom terms are replaced with placeholders before translation
-2. Apple Translation API processes the text
-3. Placeholders are restored with correct Chinese
-4. Built-in mistranslation corrections are applied
-
-### Multi-line Highlight Grouping
-
-PDF highlight annotations are rectangular, so multi-line selections need special handling:
-
-- Each line becomes a separate PDF annotation
-- All annotations share a Group ID (stored in `/PreviewNotesGroupID` annotation key)
-- The sidebar shows one note entry for the entire selection
-- Deleting removes all linked annotations together
-
-### Architecture
-
-- SwiftUI views with `NSViewRepresentable` wrapping PDFKit's `PDFView`
-- MVVM with `NotesViewModel` managing document state
-- Annotations stored directly in PDF files (standard format, compatible with other readers)
-- 30-second autosave with `NSFileCoordinator` for safe writes
-- Security-scoped resource access for sandboxed file operations
-
-## What It Does
-
-- Open and read PDF files
-- Highlight text in 5 colors (yellow, pink, blue, green, orange)
-- Add notes to your highlights
-- Translate selected English text to Chinese
-- Open multiple PDFs in tabs
+3. **First launch:** System Settings → Privacy & Security → Click "Open Anyway"
 
 ## Requirements
 
-- macOS 15.0 (Sequoia) or later (for translation feature)
-- macOS 13.0 (Ventura) minimum for basic features
-- Xcode 15.0 or later to build from source
+- macOS 13.0+ for basic features
+- macOS 15.0+ for translation
+- Xcode 15.0+ to build from source
 
 ## How to Use
 
-### Opening Files
+### Highlighting
 
-- Click the folder icon or press ⌘O to open a PDF
-- Each file opens in its own tab
-- Click the X on a tab to close it
-- A dot appears next to the tab name when there are unsaved changes
-
-### Highlighting Text
-
-1. Select text by clicking and dragging
-2. Right-click to see the context menu
-3. Click "Highlight" to highlight with the current color
-4. Or click a color name (Yellow, Pink, Blue, Green, Orange) to highlight with that color
-
-### Removing Highlights
-
-Right-click on any highlight and select "Remove Highlight"
+1. Select text
+2. Right-click → "Highlight" or choose a color
 
 ### Adding Notes
 
-1. Click on a highlight in the PDF
-2. The sidebar will show the note editor
-3. Type your note
-4. Click Save or Cancel
+1. Click on a highlight
+2. Type your note in the sidebar
+3. Click Save
 
 ### Translation
 
-1. Select English text in the PDF
-2. Right-click and choose "Translate"
-3. A popup shows the Chinese translation
-4. Click "Copy" to copy the translation
+1. Select English text
+2. Right-click → "Translate"
+3. View Chinese translation in popup
 
-**Note:** Translation requires macOS 15.0+ and the Chinese language pack installed in System Settings → General → Language & Region.
+**Note:** Requires macOS 15.0+ and Chinese language pack (System Settings → General → Language & Region).
 
 ### Custom Glossary
 
-If you want specific terms translated a certain way:
+1. Select a term
+2. Right-click → "Add to Glossary"
+3. Enter your preferred translation
 
-1. Select the English term
-2. Right-click and choose "Add to Glossary"
-3. Enter the Chinese translation you want
-4. Click Save
-
-The app includes a built-in glossary of 400+ ML/AI/Math/Coding terms with their standard Chinese translations.
-
-### Searching
-
-1. Type in the search box at the top of the sidebar
-2. Use the up/down arrows to navigate between results
-3. Click X to clear the search
-
-### Zooming
-
-- Click the + and - buttons in the toolbar
-- Or use ⌘+ to zoom in, ⌘- to zoom out
-- ⌘0 resets to 100%
-
-Available zoom levels: 50%, 75%, 100%, 125%, 150%, 200%
-
-### Saving
-
-- Press ⌘S to save
-- Press ⇧⌘S to save as a new file
-- The app also auto-saves every 30 seconds if there are changes
-
-### Page Thumbnails
-
-Click the collapsed bar on the left side of the PDF to expand page thumbnails. Click a thumbnail to jump to that page.
+Built-in glossary includes 400+ terms:
+- "transformer" → "Transformer" (not "变压器")
+- "gradient descent" → "梯度下降"
+- "token" → "词元" (not "令牌")
 
 ## Keyboard Shortcuts
 
@@ -155,11 +89,28 @@ Click the collapsed bar on the left side of the PDF to expand page thumbnails. C
 | Actual Size | ⌘0 |
 | Toggle Sidebar | ⌥⌘N |
 
+## Technical Details
+
+**Translation System**
+- Apple Translation framework with two-stage glossary
+- Custom terms replaced with placeholders before translation
+- Mistranslation corrections applied post-translation
+
+**Multi-line Highlights**
+- Each line stored as separate PDF annotation
+- Linked by Group ID for unified display/deletion
+
+**Architecture**
+- SwiftUI + PDFKit (NSViewRepresentable)
+- MVVM pattern
+- Standard PDF annotation format (compatible with other readers)
+- NSFileCoordinator for safe auto-save
+
 ## Known Limitations
 
-- Translation only works on macOS 15.0+
-- Translation requires downloading the Chinese language pack from Apple
-- The app saves annotations directly into the PDF file, which may not be compatible with all PDF readers
+- Translation requires macOS 15.0+
+- Translation requires Chinese language pack download
+- Annotations saved directly in PDF (may not work in all readers)
 
 ## License
 
