@@ -70,12 +70,6 @@ PDF highlight annotations are rectangular, so multi-line selections need special
 - macOS 13.0 (Ventura) minimum for basic features
 - Xcode 15.0 or later to build from source
 
-## How to Build
-
-1. Open `PreviewNotes.xcodeproj` in Xcode
-2. Select the "PreviewNotes" scheme
-3. Press ⌘R to build and run
-
 ## How to Use
 
 ### Opening Files
