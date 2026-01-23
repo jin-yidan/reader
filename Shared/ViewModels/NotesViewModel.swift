@@ -192,6 +192,7 @@ public class NotesViewModel: ObservableObject {
     public func refreshNotes() {
         guard let document = document else { return }
         notes = annotationService.extractNotesFromDocument(document)
+        rebuildNoteIndex()
     }
     
     // MARK: - Highlighting
@@ -199,7 +200,7 @@ public class NotesViewModel: ObservableObject {
     /// Add a highlight to selected text
     public func addHighlight(on page: PDFPage, bounds: CGRect, text: String) {
         guard document != nil else { return }
-        
+
         if let note = annotationService.createHighlightWithNote(
             on: page,
             bounds: bounds,
@@ -208,6 +209,7 @@ public class NotesViewModel: ObservableObject {
             color: highlightColor
         ) {
             notes.append(note)
+            rebuildNoteIndex()
             hasUnsavedChanges = true
             saveDocument() // Save immediately when adding highlight
         }
@@ -250,6 +252,7 @@ public class NotesViewModel: ObservableObject {
         )
 
         notes.append(note)
+        rebuildNoteIndex()
         hasUnsavedChanges = true
         saveDocument()
     }
@@ -271,8 +274,9 @@ public class NotesViewModel: ObservableObject {
             bounds: bounds,
             highlightColor: color
         )
-        
+
         notes.append(note)
+        rebuildNoteIndex()
         selectedNote = note
         editingNote = note
     }
@@ -287,6 +291,7 @@ public class NotesViewModel: ObservableObject {
         if let note = editingNote, note.noteText.isEmpty {
             // Remove empty notes that were never saved with text
             notes.removeAll { $0.id == note.id }
+            rebuildNoteIndex()
         }
         editingNote = nil
         selectedNote = nil
