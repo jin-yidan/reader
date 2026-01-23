@@ -30,11 +30,6 @@
 - 翻译功能需要 macOS 15.0（Sequoia）或更高版本
 - 如果要自己编译，需要 Xcode 15.0 或更高版本
 
-## 怎么编译
-
-1. 用 Xcode 打开 `PreviewNotes.xcodeproj`
-2. 选择 "PreviewNotes" scheme
-3. 按 ⌘R 运行
 
 ## 怎么用
 
