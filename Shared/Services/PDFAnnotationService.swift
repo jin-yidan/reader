@@ -64,18 +64,66 @@ public class PDFAnnotationService {
     private func extractNotesFromPage(_ page: PDFPage, pageIndex: Int) -> [NoteAnnotation] {
         var notes: [NoteAnnotation] = []
         let annotations = page.annotations
-        
+
         // Find all highlight annotations
         let highlights = annotations.filter { $0.type == "Highlight" }
-        
+
+        // Group highlights by groupId to handle multi-line selections
+        var groupedHighlights: [String: [PDFAnnotation]] = [:]
+        var ungroupedHighlights: [PDFAnnotation] = []
+
         for highlight in highlights {
-            // Get the highlighted text
+            if let groupId = safeAnnotationValue(for: NoteAnnotation.groupIDKey, from: highlight) {
+                groupedHighlights[groupId, default: []].append(highlight)
+            } else {
+                ungroupedHighlights.append(highlight)
+            }
+        }
+
+        // Process grouped highlights (multi-line selections)
+        for (groupIdString, groupHighlights) in groupedHighlights {
+            // Sort by vertical position (top to bottom) to maintain text order
+            let sortedHighlights = groupHighlights.sorted { $0.bounds.origin.y > $1.bounds.origin.y }
+
+            // Combine text from all highlights in the group
+            var combinedText = ""
+            for highlight in sortedHighlights {
+                let text = extractTextFromHighlight(highlight, on: page)
+                if !text.isEmpty {
+                    if !combinedText.isEmpty {
+                        combinedText += " "
+                    }
+                    combinedText += text
+                }
+            }
+
+            // Use the first (topmost) highlight for bounds and other properties
+            guard let firstHighlight = sortedHighlights.first else { continue }
+
+            let noteText = findLinkedNoteText(for: firstHighlight, in: annotations)
+            let noteID = extractNoteID(from: firstHighlight) ?? UUID()
+            let groupId = UUID(uuidString: groupIdString) ?? UUID()
+
+            let note = NoteAnnotation(
+                id: noteID,
+                highlightedText: combinedText,
+                noteText: noteText,
+                pageIndex: pageIndex,
+                bounds: firstHighlight.bounds,
+                highlightColor: firstHighlight.color ?? .yellow,
+                groupId: groupId,
+                pdfAnnotation: firstHighlight
+            )
+
+            notes.append(note)
+        }
+
+        // Process ungrouped highlights (single-line selections)
+        for highlight in ungroupedHighlights {
             let highlightedText = extractTextFromHighlight(highlight, on: page)
-            
-            // Check if there's an associated note annotation
             let noteText = findLinkedNoteText(for: highlight, in: annotations)
             let noteID = extractNoteID(from: highlight) ?? UUID()
-            
+
             let note = NoteAnnotation(
                 id: noteID,
                 highlightedText: highlightedText,
@@ -85,10 +133,10 @@ public class PDFAnnotationService {
                 highlightColor: highlight.color ?? .yellow,
                 pdfAnnotation: highlight
             )
-            
+
             notes.append(note)
         }
-        
+
         return notes
     }
     
