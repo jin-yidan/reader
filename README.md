@@ -1,4 +1,4 @@
-# 「明天读」Reader
+# 「明天读」Read It Tomorrow
 ### 我明天一定会读的:P
 ### 再也不能以preview不好用的理由不读paper了。
 
