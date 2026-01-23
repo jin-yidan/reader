@@ -89,7 +89,7 @@ public struct NoteCardView: View {
                 .frame(width: 3)
 
             // Quoted text
-            Text("\"\(note.displayText)\"")
+            Text("\"\(note.highlightedText)\"")
                 .font(.system(size: 13.5, weight: .regular, design: .serif))
                 .foregroundColor(.primary.opacity(0.8))
                 .lineSpacing(5)
