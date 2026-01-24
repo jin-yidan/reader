@@ -37,6 +37,13 @@ Open multiple papers in tabs, just like a browser.
 2. Unzip and run the app
 3. **First launch:** System Settings → Privacy & Security → Click "Open Anyway"
 
+### Set as Default PDF Reader
+
+1. Right-click any PDF file in Finder
+2. Click "Get Info" (or press ⌘I)
+3. Under "Open with:", select "明天读"
+4. Click "Change All..." to apply to all PDF files
+
 ## Requirements
 
 - macOS 13.0+ for basic features
