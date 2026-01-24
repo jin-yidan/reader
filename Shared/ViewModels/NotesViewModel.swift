@@ -527,11 +527,16 @@ public class NotesViewModel: ObservableObject {
         }
 
         do {
-            // Save current document first
-            document?.write(to: currentURL)
+            // Write document to new location (works better with sandbox than moveItem)
+            guard let doc = document else { return false }
+            let success = doc.write(to: newURL)
+            guard success else {
+                self.error = "Failed to save to new location"
+                return false
+            }
 
-            // Rename the file
-            try FileManager.default.moveItem(at: currentURL, to: newURL)
+            // Delete old file
+            try FileManager.default.removeItem(at: currentURL)
 
             // Update the URL reference
             documentURL = newURL

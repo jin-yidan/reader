@@ -141,6 +141,11 @@ class HighlightablePDFView: PDFView {
         quickHighlight.target = self
         menu.addItem(quickHighlight)
 
+        // Copy option
+        let copyItem = NSMenuItem(title: "Copy", action: #selector(copySelection(_:)), keyEquivalent: "c")
+        copyItem.target = self
+        menu.addItem(copyItem)
+
         // Translate option
         let translateItem = NSMenuItem(title: "Translate", action: #selector(translateSelection(_:)), keyEquivalent: "t")
         translateItem.target = self
@@ -211,7 +216,17 @@ class HighlightablePDFView: PDFView {
     @objc private func highlightWithCurrentColor(_ sender: NSMenuItem) {
         performHighlight(with: highlightColor)
     }
-    
+
+    @objc private func copySelection(_ sender: NSMenuItem) {
+        guard let selection = currentSelection,
+              let selectedText = selection.string,
+              !selectedText.isEmpty else {
+            return
+        }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(selectedText, forType: .string)
+    }
+
     private func performHighlight(with color: NSColor) {
         guard let selection = currentSelection,
               let selectedText = selection.string,
