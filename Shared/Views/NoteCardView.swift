@@ -14,6 +14,7 @@ public struct NoteCardView: View {
 
     @State private var editText: String = ""
     @State private var isHovering = false
+    @State private var showCopied = false
 
     public init(
         note: NoteAnnotation,
@@ -88,12 +89,40 @@ public struct NoteCardView: View {
                 .fill(Color(nsColor: note.highlightColor))
                 .frame(width: 3)
 
-            // Quoted text
-            Text("\"\(note.highlightedText)\"")
-                .font(.system(size: 13.5, weight: .regular, design: .serif))
-                .foregroundColor(.primary.opacity(0.8))
-                .lineSpacing(5)
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 8) {
+                // Quoted text
+                Text("\"\(note.highlightedText)\"")
+                    .font(.system(size: 13.5, weight: .regular, design: .serif))
+                    .foregroundColor(.primary.opacity(0.8))
+                    .lineSpacing(5)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                // Copy button (shows on hover)
+                if isHovering || showCopied {
+                    Button(action: copyHighlightedText) {
+                        HStack(spacing: 4) {
+                            Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
+                                .font(.system(size: 10))
+                            Text(showCopied ? "Copied" : "Copy")
+                                .font(.system(size: 11))
+                        }
+                        .foregroundColor(showCopied ? .green : .secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .transition(.opacity)
+                }
+            }
+        }
+        .animation(.easeOut(duration: 0.15), value: isHovering)
+        .animation(.easeOut(duration: 0.15), value: showCopied)
+    }
+
+    private func copyHighlightedText() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(note.highlightedText, forType: .string)
+        showCopied = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            showCopied = false
         }
     }
 

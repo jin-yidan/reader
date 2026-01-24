@@ -106,11 +106,14 @@ public class TabsViewModel: ObservableObject {
         }
 
         // Rename via the view model (which handles file system rename)
-        _ = viewModel.renameDocument(to: newName)
+        let success = viewModel.renameDocument(to: newName)
 
-        // Update the tab's title and URL
-        if let newURL = viewModel.getDocumentURL() {
-            tabs[index].updateAfterRename(newURL: newURL)
+        // Update the tab's title and URL if rename succeeded
+        if success, let newURL = viewModel.getDocumentURL() {
+            // Create a new tab with updated info to trigger @Published update
+            var updatedTab = tabs[index]
+            updatedTab.updateAfterRename(newURL: newURL)
+            tabs[index] = updatedTab
         }
     }
 }

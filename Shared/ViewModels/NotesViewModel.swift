@@ -518,6 +518,14 @@ public class NotesViewModel: ObservableObject {
             return false
         }
 
+        // Use security-scoped access for sandboxed operations
+        let didStartAccess = currentURL.startAccessingSecurityScopedResource()
+        defer {
+            if didStartAccess {
+                currentURL.stopAccessingSecurityScopedResource()
+            }
+        }
+
         do {
             // Save current document first
             document?.write(to: currentURL)
@@ -527,6 +535,9 @@ public class NotesViewModel: ObservableObject {
 
             // Update the URL reference
             documentURL = newURL
+
+            // Start accessing the new URL
+            _ = newURL.startAccessingSecurityScopedResource()
 
             // Reload from new location
             if let newDocument = PDFDocument(url: newURL) {
