@@ -1,4 +1,4 @@
-# 「明天读」Read It Tomorrow
+# 「Read It Tomorrow」
 
 **A lightweight PDF reader for reading academic papers on macOS.**
 
