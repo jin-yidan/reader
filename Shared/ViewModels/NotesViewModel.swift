@@ -486,7 +486,27 @@ public class NotesViewModel: ObservableObject {
     public func getDocumentURL() -> URL? {
         return documentURL
     }
-    
+
+    /// Save document to a new URL (for Save As / Rename)
+    public func saveDocumentAs(to newURL: URL) -> Bool {
+        guard let doc = document else { return false }
+
+        // Write to new location
+        let success = doc.write(to: newURL)
+        if success {
+            // Update internal references
+            documentURL = newURL
+            _ = newURL.startAccessingSecurityScopedResource()
+
+            // Reload from new location
+            if let newDocument = PDFDocument(url: newURL) {
+                document = newDocument
+            }
+            hasUnsavedChanges = false
+        }
+        return success
+    }
+
     /// Rename the document file
     public func renameDocument(to newName: String) -> Bool {
         guard let currentURL = documentURL else { return false }

@@ -1,6 +1,7 @@
 import Foundation
 import PDFKit
 import Combine
+import AppKit
 
 /// ViewModel managing multiple document tabs
 @MainActor
@@ -98,22 +99,44 @@ public class TabsViewModel: ObservableObject {
         }
     }
 
-    /// Rename a document
+    /// Rename a document using NSSavePanel for sandbox compatibility
     public func renameDocument(tab: DocumentTab, to newName: String) {
         guard let index = tabs.firstIndex(where: { $0.id == tab.id }),
-              let viewModel = viewModels[tab.id] else {
+              let viewModel = viewModels[tab.id],
+              let currentURL = viewModel.getDocumentURL() else {
             return
         }
 
-        // Rename via the view model (which handles file system rename)
-        let success = viewModel.renameDocument(to: newName)
+        // Sanitize the new name
+        let sanitizedName = newName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: "\\", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
 
-        // Update the tab's title and URL if rename succeeded
-        if success, let newURL = viewModel.getDocumentURL() {
-            // Create a new tab with updated info to trigger @Published update
-            var updatedTab = tabs[index]
-            updatedTab.updateAfterRename(newURL: newURL)
-            tabs[index] = updatedTab
+        guard !sanitizedName.isEmpty else { return }
+
+        // Show NSSavePanel for sandbox-compatible rename
+        let savePanel = NSSavePanel()
+        savePanel.allowedContentTypes = [.pdf]
+        savePanel.nameFieldStringValue = sanitizedName + ".pdf"
+        savePanel.directoryURL = currentURL.deletingLastPathComponent()
+        savePanel.title = "Rename Document"
+        savePanel.prompt = "Rename"
+
+        if savePanel.runModal() == .OK, let newURL = savePanel.url {
+            // Save to new location
+            if viewModel.saveDocumentAs(to: newURL) {
+                // Delete old file if it's different
+                if newURL != currentURL {
+                    try? FileManager.default.removeItem(at: currentURL)
+                }
+
+                // Update tab
+                var updatedTab = tabs[index]
+                updatedTab.updateAfterRename(newURL: newURL)
+                tabs[index] = updatedTab
+            }
         }
     }
 }
