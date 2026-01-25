@@ -41,6 +41,14 @@ struct ReaderApp: App {
                 }
                 .keyboardShortcut("s", modifiers: [.command, .shift])
                 .disabled(tabsViewModel.activeViewModel == nil)
+
+                Divider()
+
+                Button("Export Notes...") {
+                    tabsViewModel.activeViewModel?.exportNotes()
+                }
+                .keyboardShortcut("e", modifiers: .command)
+                .disabled(tabsViewModel.activeViewModel?.notes.isEmpty ?? true)
             }
             
             // Find menu

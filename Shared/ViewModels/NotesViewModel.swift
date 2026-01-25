@@ -2,6 +2,7 @@ import Foundation
 import PDFKit
 import Combine
 import AppKit
+import UniformTypeIdentifiers
 
 /// ViewModel managing the notes for a PDF document
 @MainActor
@@ -36,6 +37,7 @@ public class NotesViewModel: ObservableObject {
     private var hasSecurityScopedAccess = false
     private var isSaveInProgress = false
     private var pendingSave = false
+    private var pendingAutosaveTask: Task<Void, Never>?
 
     /// Index for fast note lookup by page and bounds
     private var noteIndex: [String: NoteAnnotation] = [:]
@@ -48,6 +50,16 @@ public class NotesViewModel: ObservableObject {
         noteIndex = Dictionary(uniqueKeysWithValues: notes.map { note in
             (noteKey(pageIndex: note.pageIndex, bounds: note.bounds), note)
         })
+    }
+
+    /// Add a note to the index (incremental update)
+    private func addToIndex(_ note: NoteAnnotation) {
+        noteIndex[noteKey(pageIndex: note.pageIndex, bounds: note.bounds)] = note
+    }
+
+    /// Remove a note from the index (incremental update)
+    private func removeFromIndex(_ note: NoteAnnotation) {
+        noteIndex.removeValue(forKey: noteKey(pageIndex: note.pageIndex, bounds: note.bounds))
     }
 
     /// Fast lookup for note by page and bounds
@@ -116,11 +128,21 @@ public class NotesViewModel: ObservableObject {
     // MARK: - Autosave
     
     private func setupAutosave() {
-        // Autosave every 5 seconds if there are unsaved changes
-        autosaveTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+        // Autosave every 30 seconds if there are unsaved changes
+        autosaveTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.autosave()
             }
+        }
+    }
+
+    /// Schedule a debounced autosave (2 second delay)
+    private func scheduleAutosave() {
+        pendingAutosaveTask?.cancel()
+        pendingAutosaveTask = Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2s debounce
+            guard !Task.isCancelled else { return }
+            saveDocument()
         }
     }
     
@@ -209,9 +231,9 @@ public class NotesViewModel: ObservableObject {
             color: highlightColor
         ) {
             notes.append(note)
-            rebuildNoteIndex()
+            addToIndex(note)
             hasUnsavedChanges = true
-            saveDocument() // Save immediately when adding highlight
+            scheduleAutosave()
         }
     }
     
@@ -252,13 +274,13 @@ public class NotesViewModel: ObservableObject {
         )
 
         notes.append(note)
-        rebuildNoteIndex()
+        addToIndex(note)
         hasUnsavedChanges = true
-        saveDocument()
+        scheduleAutosave()
     }
-    
+
     // MARK: - Note Management
-    
+
     /// Add a note entry for an existing highlight (when user clicks on highlight to add note)
     public func addHighlightNote(pageIndex: Int, bounds: CGRect, text: String, color: NSColor) {
         // Check if note already exists
@@ -276,7 +298,7 @@ public class NotesViewModel: ObservableObject {
         )
 
         notes.append(note)
-        rebuildNoteIndex()
+        addToIndex(note)
         selectedNote = note
         editingNote = note
     }
@@ -291,7 +313,7 @@ public class NotesViewModel: ObservableObject {
         if let note = editingNote, note.noteText.isEmpty {
             // Remove empty notes that were never saved with text
             notes.removeAll { $0.id == note.id }
-            rebuildNoteIndex()
+            removeFromIndex(note)
         }
         editingNote = nil
         selectedNote = nil
@@ -318,16 +340,16 @@ public class NotesViewModel: ObservableObject {
         if let index = notes.firstIndex(where: { $0.id == note.id }) {
             notes[index] = updatedNote
         }
-        
+
         hasUnsavedChanges = true
-        saveDocument()
+        scheduleAutosave()
         editingNote = nil
     }
-    
+
     /// Delete a note (keeps the highlight)
     public func deleteNote(_ note: NoteAnnotation) {
         guard let document = document else { return }
-        
+
         if annotationService.deleteNote(note, from: document) {
             // Update local state
             if let index = notes.firstIndex(where: { $0.id == note.id }) {
@@ -335,9 +357,9 @@ public class NotesViewModel: ObservableObject {
                 updatedNote.noteText = ""
                 notes[index] = updatedNote
             }
-            
+
             hasUnsavedChanges = true
-            saveDocument()
+            scheduleAutosave()
         }
     }
     
@@ -349,10 +371,10 @@ public class NotesViewModel: ObservableObject {
         deleteAnnotationsInGroup(groupId: note.groupId, from: document)
 
         // Remove from local state
+        removeFromIndex(note)
         notes.removeAll { $0.id == note.id }
-        rebuildNoteIndex()
         hasUnsavedChanges = true
-        saveDocument()
+        scheduleAutosave()
     }
     
     /// Delete all annotations that share the same group ID
@@ -395,7 +417,7 @@ public class NotesViewModel: ObservableObject {
     
     // MARK: - Document Saving
 
-    /// Save the document to disk
+    /// Save the document to disk (performs file I/O on background thread)
     public func saveDocument() {
         guard let document = document, let url = documentURL else { return }
 
@@ -408,40 +430,45 @@ public class NotesViewModel: ObservableObject {
         isSaveInProgress = true
         saveStatus = .saving
 
-        // Use file coordinator for sandboxed app compatibility
-        var coordinatorError: NSError?
-        var saveSucceeded = false
-        var saveError: String?
+        // Get data on main thread (PDFDocument not thread-safe)
+        guard let documentData = document.dataRepresentation() else {
+            isSaveInProgress = false
+            saveStatus = .failed("Could not generate PDF data")
+            return
+        }
 
-        let coordinator = NSFileCoordinator(filePresenter: nil)
-        coordinator.coordinate(writingItemAt: url, options: .forReplacing, error: &coordinatorError) { newURL in
-            // Try primary save method first
-            if document.write(to: newURL) {
-                saveSucceeded = true
-                return
-            }
+        // Write on background thread to avoid blocking UI
+        Task.detached(priority: .utility) { [weak self] in
+            var success = false
+            var saveError: String?
 
-            // Fallback: try using data representation
-            if let data = document.dataRepresentation() {
+            let coordinator = NSFileCoordinator(filePresenter: nil)
+            var coordinatorError: NSError?
+
+            coordinator.coordinate(writingItemAt: url, options: .forReplacing, error: &coordinatorError) { newURL in
                 do {
-                    try data.write(to: newURL, options: .atomic)
-                    saveSucceeded = true
+                    try documentData.write(to: newURL, options: .atomic)
+                    success = true
                 } catch let writeError {
                     saveError = writeError.localizedDescription
                 }
-            } else {
-                saveError = "Could not generate PDF data"
+            }
+
+            if let coordinatorError = coordinatorError {
+                saveError = coordinatorError.localizedDescription
+            }
+
+            await MainActor.run { [weak self] in
+                self?.handleSaveCompletion(succeeded: success, errorMessage: saveError)
             }
         }
+    }
 
-        if let coordinatorError = coordinatorError {
-            saveError = coordinatorError.localizedDescription
-        }
-
-        // Mark save as complete
+    /// Handle save completion (called on main actor after background save)
+    private func handleSaveCompletion(succeeded: Bool, errorMessage: String?) {
         isSaveInProgress = false
 
-        if saveSucceeded {
+        if succeeded {
             hasUnsavedChanges = false
             saveStatus = .saved
 
@@ -450,14 +477,12 @@ public class NotesViewModel: ObservableObject {
             saveStatusResetTask = Task {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    if case .saved = self.saveStatus {
-                        self.saveStatus = .idle
-                    }
+                if case .saved = self.saveStatus {
+                    self.saveStatus = .idle
                 }
             }
         } else {
-            let reason = saveError ?? "Unknown error"
+            let reason = errorMessage ?? "Unknown error"
             saveStatus = .failed(reason)
             error = "Failed to save: \(reason)"
         }
@@ -466,8 +491,9 @@ public class NotesViewModel: ObservableObject {
         if pendingSave {
             pendingSave = false
             // Use slight delay to prevent tight loop
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                self?.saveDocument()
+            Task {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+                saveDocument()
             }
         }
     }
@@ -586,6 +612,10 @@ public class NotesViewModel: ObservableObject {
             deleteAnnotationsInGroup(groupId: groupId, from: document)
 
             // Remove the note entry if it exists
+            let notesToRemove = notes.filter { $0.groupId == groupId }
+            for note in notesToRemove {
+                removeFromIndex(note)
+            }
             notes.removeAll { $0.groupId == groupId }
         } else {
             // Single annotation - just remove it
@@ -595,20 +625,24 @@ public class NotesViewModel: ObservableObject {
             if let pageIndex = (0..<document.pageCount).first(where: { document.page(at: $0) == page }) {
                 // Try multiple matching strategies
                 let annotationBounds = annotation.bounds
-                notes.removeAll { note in
+                let notesToRemove = notes.filter { note in
                     guard note.pageIndex == pageIndex else { return false }
                     // Match by stored annotation reference
                     if note.pdfAnnotation === annotation { return true }
                     // Match by bounds with tolerance
                     return boundsMatch(note.bounds, annotationBounds)
                 }
+                for note in notesToRemove {
+                    removeFromIndex(note)
+                }
+                notes.removeAll { note in
+                    notesToRemove.contains { $0.id == note.id }
+                }
             }
         }
 
-        // Rebuild the index after modification
-        rebuildNoteIndex()
         hasUnsavedChanges = true
-        saveDocument()
+        scheduleAutosave()
     }
 
     /// Compare bounds with tolerance for floating-point precision
@@ -653,6 +687,32 @@ public class NotesViewModel: ObservableObject {
                 error = "Failed to save document"
                 saveStatus = .failed("Failed to save document")
             }
+        }
+    }
+
+    // MARK: - Export Notes
+
+    /// Export notes to markdown file
+    public func exportNotes() {
+        guard !notes.isEmpty else { return }
+
+        let savePanel = NSSavePanel()
+        savePanel.allowedContentTypes = [UTType.plainText]
+        savePanel.nameFieldStringValue = "\(documentTitle)-notes.md"
+        savePanel.canCreateDirectories = true
+
+        if savePanel.runModal() == .OK, let url = savePanel.url {
+            var content = "# Notes: \(documentTitle)\n\n"
+            for page in notesByPage {
+                content += "## Page \(page.pageNumber)\n\n"
+                for note in page.notes {
+                    content += "> \(note.highlightedText)\n\n"
+                    if !note.noteText.isEmpty {
+                        content += "\(note.noteText)\n\n"
+                    }
+                }
+            }
+            try? content.write(to: url, atomically: true, encoding: .utf8)
         }
     }
 

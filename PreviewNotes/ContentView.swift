@@ -1,5 +1,6 @@
 import SwiftUI
 import PDFKit
+import UniformTypeIdentifiers
 
 /// Main content view for the standalone app with tab support
 struct MainContentView: View {
@@ -129,30 +130,98 @@ struct MainContentView: View {
     }
     
     private var welcomeView: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "book")
-                .font(.system(size: 64))
-                .foregroundColor(.secondary.opacity(0.4))
-            
-            VStack(spacing: 8) {
-                Text("Welcome to Reader")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(.primary)
-                
-                Text("Open a PDF to start reading and annotating")
-                    .font(.system(size: 14))
-                    .foregroundColor(.secondary)
+        GeometryReader { geometry in
+            HStack(spacing: 0) {
+                Spacer().frame(width: geometry.size.width * 0.12)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    Spacer().frame(height: geometry.size.height * 0.38)
+
+                    // Subtle app identifier
+                    Text("READ IT TOMORROW")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary.opacity(0.4))
+                        .tracking(2)
+
+                    Spacer().frame(height: 20)
+
+                    // Main text - conversational, not commanding
+                    Text("Drop a PDF here")
+                        .font(.system(size: 26, weight: .light))
+                        .foregroundColor(.primary.opacity(0.8))
+
+                    HStack(spacing: 0) {
+                        Text("or ")
+                            .font(.system(size: 26, weight: .light))
+                            .foregroundColor(.primary.opacity(0.8))
+                        Text("browse")
+                            .font(.system(size: 26, weight: .regular))
+                            .foregroundColor(.accentColor)
+                            .onTapGesture { openDocument() }
+                            .onHover { hovering in
+                                if hovering {
+                                    NSCursor.pointingHand.push()
+                                } else {
+                                    NSCursor.pop()
+                                }
+                            }
+                    }
+
+                    Spacer()
+
+                    // Subtle hint
+                    HStack(spacing: 4) {
+                        Text("\u{2318}O")
+                            .font(.system(size: 11, design: .monospaced))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(Color.secondary.opacity(0.1))
+                            .cornerRadius(3)
+                        Text("to open")
+                            .font(.system(size: 11))
+                    }
+                    .foregroundColor(.secondary.opacity(0.4))
+                    .padding(.bottom, 40)
+                }
+
+                Spacer()
             }
-            
-            Button(action: openDocument) {
-                Label("Open PDF", systemImage: "folder")
-                    .font(.system(size: 14, weight: .medium))
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(nsColor: .textBackgroundColor))
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .textBackgroundColor))
+        .onDrop(of: [.pdf, .fileURL], isTargeted: nil) { providers in
+            handleDrop(providers: providers)
+        }
+    }
+
+    private func handleDrop(providers: [NSItemProvider]) -> Bool {
+        for provider in providers {
+            // Try PDF type first
+            if provider.hasItemConformingToTypeIdentifier("com.adobe.pdf") {
+                provider.loadItem(forTypeIdentifier: "com.adobe.pdf", options: nil) { item, _ in
+                    if let url = item as? URL {
+                        Task { @MainActor in
+                            await tabsViewModel.openDocument(from: url)
+                        }
+                    }
+                }
+                return true
+            }
+            // Try file URL
+            if provider.hasItemConformingToTypeIdentifier("public.file-url") {
+                provider.loadItem(forTypeIdentifier: "public.file-url", options: nil) { item, _ in
+                    if let data = item as? Data,
+                       let url = URL(dataRepresentation: data, relativeTo: nil),
+                       url.pathExtension.lowercased() == "pdf" {
+                        Task { @MainActor in
+                            await tabsViewModel.openDocument(from: url)
+                        }
+                    }
+                }
+                return true
+            }
+        }
+        return false
     }
     
     // MARK: - Toolbar
@@ -188,6 +257,14 @@ struct MainContentView: View {
                 .disabled(currentZoom >= (NotesViewModel.zoomPresets.last ?? 2.0))
                 .help("Zoom In (⌘+)")
                 .accessibilityLabel("Zoom in")
+
+                // Export notes button
+                Button(action: { activeViewModel?.exportNotes() }) {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .disabled(activeViewModel?.notes.isEmpty ?? true)
+                .help("Export Notes (⌘E)")
+                .accessibilityLabel("Export notes")
             }
 
             // Notes sidebar toggle
