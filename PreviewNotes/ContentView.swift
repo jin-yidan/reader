@@ -260,9 +260,9 @@ struct MainContentView: View {
 
                 // Share button with AirDrop support
                 ShareButton(items: activeViewModel?.getShareItems() ?? [])
-                    .disabled(activeViewModel?.notes.isEmpty ?? true)
+                    .disabled(activeViewModel?.getDocumentURL() == nil)
                     .help("Share (⌘E)")
-                    .accessibilityLabel("Share notes")
+                    .accessibilityLabel("Share")
             }
 
             // Notes sidebar toggle
