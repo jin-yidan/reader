@@ -690,9 +690,24 @@ public class NotesViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Export Notes
+    // MARK: - Export & Share Notes
 
-    /// Export notes to markdown file
+    /// Generate markdown content for notes
+    public func generateNotesMarkdown() -> String {
+        var content = "# Notes: \(documentTitle)\n\n"
+        for page in notesByPage {
+            content += "## Page \(page.pageNumber)\n\n"
+            for note in page.notes {
+                content += "> \(note.highlightedText)\n\n"
+                if !note.noteText.isEmpty {
+                    content += "\(note.noteText)\n\n"
+                }
+            }
+        }
+        return content
+    }
+
+    /// Export notes to markdown file via save panel
     public func exportNotes() {
         guard !notes.isEmpty else { return }
 
@@ -702,18 +717,42 @@ public class NotesViewModel: ObservableObject {
         savePanel.canCreateDirectories = true
 
         if savePanel.runModal() == .OK, let url = savePanel.url {
-            var content = "# Notes: \(documentTitle)\n\n"
-            for page in notesByPage {
-                content += "## Page \(page.pageNumber)\n\n"
-                for note in page.notes {
-                    content += "> \(note.highlightedText)\n\n"
-                    if !note.noteText.isEmpty {
-                        content += "\(note.noteText)\n\n"
-                    }
-                }
-            }
+            let content = generateNotesMarkdown()
             try? content.write(to: url, atomically: true, encoding: .utf8)
         }
+    }
+
+    /// Create a temporary file with notes for sharing, returns the URL
+    public func createShareableNotesFile() -> URL? {
+        guard !notes.isEmpty else { return nil }
+
+        let content = generateNotesMarkdown()
+        let tempDir = FileManager.default.temporaryDirectory
+        let fileURL = tempDir.appendingPathComponent("\(documentTitle)-notes.md")
+
+        do {
+            try content.write(to: fileURL, atomically: true, encoding: .utf8)
+            return fileURL
+        } catch {
+            return nil
+        }
+    }
+
+    /// Get items for sharing (notes file and/or PDF)
+    public func getShareItems() -> [Any] {
+        var items: [Any] = []
+
+        // Add notes file if there are notes
+        if let notesURL = createShareableNotesFile() {
+            items.append(notesURL)
+        }
+
+        // Also include the PDF if available
+        if let pdfURL = documentURL {
+            items.append(pdfURL)
+        }
+
+        return items
     }
 
 }

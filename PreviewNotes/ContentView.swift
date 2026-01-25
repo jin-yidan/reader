@@ -258,13 +258,11 @@ struct MainContentView: View {
                 .help("Zoom In (⌘+)")
                 .accessibilityLabel("Zoom in")
 
-                // Export notes button
-                Button(action: { activeViewModel?.exportNotes() }) {
-                    Image(systemName: "square.and.arrow.up")
-                }
-                .disabled(activeViewModel?.notes.isEmpty ?? true)
-                .help("Export Notes (⌘E)")
-                .accessibilityLabel("Export notes")
+                // Share button with AirDrop support
+                ShareButton(items: activeViewModel?.getShareItems() ?? [])
+                    .disabled(activeViewModel?.notes.isEmpty ?? true)
+                    .help("Share (⌘E)")
+                    .accessibilityLabel("Share notes")
             }
 
             // Notes sidebar toggle
@@ -543,6 +541,46 @@ struct PDFViewContainer: NSViewRepresentable {
         // Keep reference updated
         if pdfViewRef.pdfView !== pdfView {
             pdfViewRef.pdfView = pdfView
+        }
+    }
+}
+
+// MARK: - Share Button
+
+/// Native share button that shows NSSharingServicePicker with AirDrop support
+struct ShareButton: NSViewRepresentable {
+    let items: [Any]
+
+    func makeNSView(context: Context) -> NSButton {
+        let button = NSButton()
+        button.bezelStyle = .toolbar
+        button.image = NSImage(systemSymbolName: "square.and.arrow.up", accessibilityDescription: "Share")
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.showSharePicker(_:))
+        button.isBordered = false
+        return button
+    }
+
+    func updateNSView(_ nsView: NSButton, context: Context) {
+        context.coordinator.items = items
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(items: items)
+    }
+
+    class Coordinator: NSObject {
+        var items: [Any]
+
+        init(items: [Any]) {
+            self.items = items
+        }
+
+        @objc func showSharePicker(_ sender: NSButton) {
+            guard !items.isEmpty else { return }
+
+            let picker = NSSharingServicePicker(items: items)
+            picker.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
         }
     }
 }
