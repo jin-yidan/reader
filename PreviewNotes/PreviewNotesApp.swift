@@ -3,31 +3,32 @@ import SwiftUI
 @main
 struct ReaderApp: App {
     @StateObject private var tabsViewModel = TabsViewModel()
-    
+    @State private var hasOpenedDocument = false
+
     var body: some Scene {
         WindowGroup {
             MainContentView(tabsViewModel: tabsViewModel)
                 .onOpenURL { url in
                     Task { @MainActor in
                         await tabsViewModel.openDocument(from: url)
+                        hasOpenedDocument = true
                     }
                 }
                 .onAppear {
-                    // Show file picker immediately on launch if no documents are open
+                    // Hide window and show file picker on launch
                     if !tabsViewModel.hasOpenTabs {
+                        if let window = NSApplication.shared.windows.first {
+                            window.orderOut(nil)
+                        }
                         DispatchQueue.main.async {
                             self.openDocumentOrQuit()
                         }
                     }
                 }
-                .onReceive(tabsViewModel.$tabs) { tabs in
-                    // Quit app when all tabs are closed
-                    if tabs.isEmpty && NSApplication.shared.windows.first?.isVisible == true {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            if tabsViewModel.tabs.isEmpty {
-                                NSApplication.shared.terminate(nil)
-                            }
-                        }
+                .onChange(of: tabsViewModel.tabs.count) { count in
+                    // Quit app when all tabs are closed (but only after having opened something)
+                    if count == 0 && hasOpenedDocument {
+                        NSApplication.shared.terminate(nil)
                     }
                 }
         }
@@ -151,6 +152,11 @@ struct ReaderApp: App {
         if panel.runModal() == .OK, let url = panel.url {
             Task { @MainActor in
                 await tabsViewModel.openDocument(from: url)
+                hasOpenedDocument = true
+                // Show window after document is loaded
+                if let window = NSApplication.shared.windows.first {
+                    window.makeKeyAndOrderFront(nil)
+                }
             }
         } else {
             // User cancelled - quit the app
