@@ -738,21 +738,12 @@ public class NotesViewModel: ObservableObject {
         }
     }
 
-    /// Get items for sharing (PDF and optionally notes file)
+    /// Get items for sharing (just the PDF file with original name)
     public func getShareItems() -> [Any] {
-        var items: [Any] = []
-
-        // Always include the PDF first if available
         if let pdfURL = documentURL {
-            items.append(pdfURL)
+            return [pdfURL]
         }
-
-        // Also add notes file if there are notes
-        if let notesURL = createShareableNotesFile() {
-            items.append(notesURL)
-        }
-
-        return items
+        return []
     }
 
 }

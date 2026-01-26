@@ -14,7 +14,9 @@ struct MainContentView: View {
     @State private var currentZoom: CGFloat = 1.0
     @State private var searchDebounceTask: Task<Void, Never>?
     @State private var sidebarWidth: CGFloat = 300
-    
+    @State private var currentPage: Int = 1
+    @State private var totalPages: Int = 1
+
     private var activeViewModel: NotesViewModel? {
         tabsViewModel.activeViewModel
     }
@@ -73,6 +75,10 @@ struct MainContentView: View {
             toolbarContent
         }
         .navigationTitle(navigationTitle)
+        .navigationSubtitle(pageIndicator)
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name.PDFViewPageChanged)) { notification in
+            updatePageInfo()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .toggleSidebar)) { _ in
             withAnimation(.easeInOut(duration: 0.2)) {
                 showingSidebar.toggle()
@@ -92,6 +98,7 @@ struct MainContentView: View {
                 // Also update the PDF view directly in case the view hasn't updated yet
                 DispatchQueue.main.async {
                     pdfViewRef.pdfView?.scaleFactor = vm.zoomScale
+                    updatePageInfo()
                 }
             }
         }
@@ -104,13 +111,30 @@ struct MainContentView: View {
         }
         .onAppear {
             syncZoomFromViewModel()
+            updatePageInfo()
         }
     }
     
     private var navigationTitle: String {
         tabsViewModel.activeTab?.title ?? "Reader"
     }
-    
+
+    private var pageIndicator: String {
+        guard activeViewModel != nil else { return "" }
+        return "Page \(currentPage) of \(totalPages)"
+    }
+
+    private func updatePageInfo() {
+        guard let pdfView = pdfViewRef.pdfView,
+              let document = pdfView.document,
+              let currentPDFPage = pdfView.currentPage else {
+            return
+        }
+        totalPages = document.pageCount
+        let pageIndex = document.index(for: currentPDFPage)
+        currentPage = pageIndex + 1
+    }
+
     private func syncZoomFromViewModel() {
         if let vm = activeViewModel {
             currentZoom = vm.zoomScale
@@ -137,65 +161,33 @@ struct MainContentView: View {
     }
     
     private var welcomeView: some View {
-        GeometryReader { geometry in
-            HStack(spacing: 0) {
-                Spacer().frame(width: geometry.size.width * 0.12)
+        VStack(spacing: 16) {
+            Spacer()
 
-                VStack(alignment: .leading, spacing: 0) {
-                    Spacer().frame(height: geometry.size.height * 0.38)
+            Image(systemName: "doc.text")
+                .font(.system(size: 48))
+                .foregroundColor(.secondary.opacity(0.5))
 
-                    // Subtle app identifier
-                    Text("READ IT TOMORROW")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.secondary.opacity(0.4))
-                        .tracking(2)
+            Text("Open a PDF to get started")
+                .font(.system(size: 14))
+                .foregroundColor(.secondary)
 
-                    Spacer().frame(height: 20)
-
-                    // Main text - conversational, not commanding
-                    Text("Drop a PDF here")
-                        .font(.system(size: 26, weight: .light))
-                        .foregroundColor(.primary.opacity(0.8))
-
-                    HStack(spacing: 0) {
-                        Text("or ")
-                            .font(.system(size: 26, weight: .light))
-                            .foregroundColor(.primary.opacity(0.8))
-                        Text("browse")
-                            .font(.system(size: 26, weight: .regular))
-                            .foregroundColor(.accentColor)
-                            .onTapGesture { openDocument() }
-                            .onHover { hovering in
-                                if hovering {
-                                    NSCursor.pointingHand.push()
-                                } else {
-                                    NSCursor.pop()
-                                }
-                            }
-                    }
-
-                    Spacer()
-
-                    // Subtle hint
-                    HStack(spacing: 4) {
-                        Text("\u{2318}O")
-                            .font(.system(size: 11, design: .monospaced))
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(Color.secondary.opacity(0.1))
-                            .cornerRadius(3)
-                        Text("to open")
-                            .font(.system(size: 11))
-                    }
-                    .foregroundColor(.secondary.opacity(0.4))
-                    .padding(.bottom, 40)
-                }
-
-                Spacer()
+            Button(action: openDocument) {
+                Text("Open")
+                    .frame(width: 80)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(nsColor: .textBackgroundColor))
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+
+            Spacer()
+
+            Text("or drop a file here")
+                .font(.system(size: 12))
+                .foregroundColor(.secondary.opacity(0.5))
+                .padding(.bottom, 20)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(nsColor: .textBackgroundColor))
         .onDrop(of: [.pdf, .fileURL], isTargeted: nil) { providers in
             handleDrop(providers: providers)
         }
