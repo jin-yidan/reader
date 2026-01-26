@@ -1,8 +1,10 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Tab bar for managing multiple open documents - tabs evenly divide available width
 public struct TabBarView: View {
     @ObservedObject var tabsViewModel: TabsViewModel
+    @State private var draggingTab: DocumentTab?
 
     public init(tabsViewModel: TabsViewModel) {
         self.tabsViewModel = tabsViewModel
@@ -27,6 +29,16 @@ public struct TabBarView: View {
                         tabsViewModel.renameDocument(tab: tab, to: newName)
                     }
                 )
+                .opacity(draggingTab?.id == tab.id ? 0.5 : 1.0)
+                .onDrag {
+                    draggingTab = tab
+                    return NSItemProvider(object: tab.id.uuidString as NSString)
+                }
+                .onDrop(of: [UTType.text], delegate: TabDropDelegate(
+                    tab: tab,
+                    tabs: $tabsViewModel.tabs,
+                    draggingTab: $draggingTab
+                ))
                 .transition(.asymmetric(
                     insertion: .opacity.combined(with: .scale(scale: 0.9)),
                     removal: .opacity.combined(with: .scale(scale: 0.9))
@@ -36,6 +48,36 @@ public struct TabBarView: View {
         .frame(height: 36)
         .background(Color(nsColor: .windowBackgroundColor))
         .animation(.easeInOut(duration: 0.2), value: tabsViewModel.tabs.count)
+        .animation(.easeInOut(duration: 0.15), value: tabsViewModel.tabs.map { $0.id })
+    }
+}
+
+/// Drop delegate for tab reordering
+struct TabDropDelegate: DropDelegate {
+    let tab: DocumentTab
+    @Binding var tabs: [DocumentTab]
+    @Binding var draggingTab: DocumentTab?
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggingTab = nil
+        return true
+    }
+
+    func dropEntered(info: DropInfo) {
+        guard let dragging = draggingTab,
+              dragging.id != tab.id,
+              let fromIndex = tabs.firstIndex(where: { $0.id == dragging.id }),
+              let toIndex = tabs.firstIndex(where: { $0.id == tab.id }) else {
+            return
+        }
+
+        withAnimation(.easeInOut(duration: 0.15)) {
+            tabs.move(fromOffsets: IndexSet(integer: fromIndex), toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex)
+        }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
     }
 }
 

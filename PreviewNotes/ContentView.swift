@@ -82,11 +82,18 @@ struct MainContentView: View {
             // Focus the search field in sidebar
             showingSidebar = true
         }
-        .onChange(of: tabsViewModel.activeTabId) { _ in
+        .onChange(of: tabsViewModel.activeTabId) { newId in
             // Reset state when switching tabs
             // Note: Don't nil out pdfViewRef here - let updateNSView handle the reference
             clearSearch()
-            syncZoomFromViewModel()
+            // Sync zoom from the new active viewModel
+            if let newId = newId, let vm = tabsViewModel.viewModels[newId] {
+                currentZoom = vm.zoomScale
+                // Also update the PDF view directly in case the view hasn't updated yet
+                DispatchQueue.main.async {
+                    pdfViewRef.pdfView?.scaleFactor = vm.zoomScale
+                }
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .zoomChanged)) { notification in
             // Sync zoom when it changes from keyboard shortcuts
@@ -553,11 +560,24 @@ struct ShareButton: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSButton {
         let button = NSButton()
-        button.bezelStyle = .toolbar
-        button.image = NSImage(systemSymbolName: "square.and.arrow.up", accessibilityDescription: "Share")
+        button.bezelStyle = .regularSquare
+        button.isBordered = false
+        button.imagePosition = .imageOnly
+
+        // Configure image to match SwiftUI toolbar button style
+        let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .regular)
+        if let image = NSImage(systemSymbolName: "square.and.arrow.up", accessibilityDescription: "Share") {
+            button.image = image.withSymbolConfiguration(config)
+        }
+        button.contentTintColor = .secondaryLabelColor
+
         button.target = context.coordinator
         button.action = #selector(Coordinator.showSharePicker(_:))
-        button.isBordered = false
+
+        // Remove focus ring and set size
+        button.focusRingType = .none
+        button.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+
         return button
     }
 

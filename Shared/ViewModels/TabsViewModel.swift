@@ -9,9 +9,9 @@ public class TabsViewModel: ObservableObject {
     
     // MARK: - Published Properties
     
-    @Published public private(set) var tabs: [DocumentTab] = []
+    @Published public var tabs: [DocumentTab] = []
     @Published public var activeTabId: UUID?
-    @Published private var viewModels: [UUID: NotesViewModel] = [:]
+    @Published public private(set) var viewModels: [UUID: NotesViewModel] = [:]
     
     // MARK: - Computed Properties
     
