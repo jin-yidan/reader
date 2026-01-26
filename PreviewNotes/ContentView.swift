@@ -161,36 +161,11 @@ struct MainContentView: View {
     }
     
     private var welcomeView: some View {
-        VStack(spacing: 16) {
-            Spacer()
-
-            Image(systemName: "doc.text")
-                .font(.system(size: 48))
-                .foregroundColor(.secondary.opacity(0.5))
-
-            Text("Open a PDF to get started")
-                .font(.system(size: 14))
-                .foregroundColor(.secondary)
-
-            Button(action: openDocument) {
-                Text("Open")
-                    .frame(width: 80)
+        Color(nsColor: .textBackgroundColor)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onDrop(of: [.pdf, .fileURL], isTargeted: nil) { providers in
+                handleDrop(providers: providers)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-
-            Spacer()
-
-            Text("or drop a file here")
-                .font(.system(size: 12))
-                .foregroundColor(.secondary.opacity(0.5))
-                .padding(.bottom, 20)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .textBackgroundColor))
-        .onDrop(of: [.pdf, .fileURL], isTargeted: nil) { providers in
-            handleDrop(providers: providers)
-        }
     }
 
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
