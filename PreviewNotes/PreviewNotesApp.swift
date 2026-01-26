@@ -16,7 +16,17 @@ struct ReaderApp: App {
                     // Show file picker immediately on launch if no documents are open
                     if !tabsViewModel.hasOpenTabs {
                         DispatchQueue.main.async {
-                            openDocument()
+                            self.openDocumentOrQuit()
+                        }
+                    }
+                }
+                .onReceive(tabsViewModel.$tabs) { tabs in
+                    // Quit app when all tabs are closed
+                    if tabs.isEmpty && NSApplication.shared.windows.first?.isVisible == true {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            if tabsViewModel.tabs.isEmpty {
+                                NSApplication.shared.terminate(nil)
+                            }
                         }
                     }
                 }
@@ -123,11 +133,28 @@ struct ReaderApp: App {
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
-        
+
         if panel.runModal() == .OK, let url = panel.url {
             Task { @MainActor in
                 await tabsViewModel.openDocument(from: url)
             }
+        }
+    }
+
+    private func openDocumentOrQuit() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.pdf]
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+
+        if panel.runModal() == .OK, let url = panel.url {
+            Task { @MainActor in
+                await tabsViewModel.openDocument(from: url)
+            }
+        } else {
+            // User cancelled - quit the app
+            NSApplication.shared.terminate(nil)
         }
     }
 }
