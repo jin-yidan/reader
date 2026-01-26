@@ -12,6 +12,14 @@ struct ReaderApp: App {
                         await tabsViewModel.openDocument(from: url)
                     }
                 }
+                .onAppear {
+                    // Show file picker immediately on launch if no documents are open
+                    if !tabsViewModel.hasOpenTabs {
+                        DispatchQueue.main.async {
+                            openDocument()
+                        }
+                    }
+                }
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
