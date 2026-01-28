@@ -97,8 +97,17 @@ struct TabItemView: View {
 
     var body: some View {
         ZStack {
-            // Background
+            // Background - responds to taps
             tabBackground
+                .contentShape(Rectangle())
+                .onTapGesture(count: 2) {
+                    startEditing()
+                }
+                .onTapGesture(count: 1) {
+                    if !isEditing {
+                        onSelect()
+                    }
+                }
 
             // Content
             HStack(spacing: 8) {
@@ -137,7 +146,7 @@ struct TabItemView: View {
 
                 Spacer(minLength: 4)
 
-                // Close button
+                // Close button - outside the tap gesture area
                 closeButton
             }
             .padding(.horizontal, 12)
@@ -145,15 +154,6 @@ struct TabItemView: View {
         }
         .frame(maxWidth: .infinity)
         .overlay(tabBorder)
-        .contentShape(Rectangle())
-        .onTapGesture(count: 2) {
-            startEditing()
-        }
-        .onTapGesture(count: 1) {
-            if !isEditing {
-                onSelect()
-            }
-        }
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.1)) {
                 isHovering = hovering
@@ -169,20 +169,22 @@ struct TabItemView: View {
     }
 
     private var closeButton: some View {
-        Image(systemName: "xmark")
-            .font(.system(size: 9, weight: .semibold))
-            .foregroundColor(.secondary.opacity(0.7))
-            .frame(width: 18, height: 18)
-            .background(
-                Circle()
-                    .fill(Color(nsColor: .controlBackgroundColor))
-                    .opacity(isHovering ? 1 : 0)
-            )
-            .opacity(isHovering || isActive ? 1 : 0.3)
-            .onTapGesture {
-                onClose()
-            }
-            .accessibilityLabel("Close tab")
+        Button(action: onClose) {
+            Image(systemName: "xmark")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundColor(.secondary.opacity(0.7))
+        }
+        .buttonStyle(.plain)
+        .frame(width: 24, height: 24)
+        .contentShape(Rectangle())
+        .background(
+            Circle()
+                .fill(Color(nsColor: .controlBackgroundColor))
+                .opacity(isHovering ? 1 : 0)
+                .frame(width: 18, height: 18)
+        )
+        .opacity(isHovering || isActive ? 1 : 0.3)
+        .accessibilityLabel("Close tab")
     }
 
     private var tabBackground: some View {

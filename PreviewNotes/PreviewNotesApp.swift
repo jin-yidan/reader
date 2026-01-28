@@ -2,19 +2,27 @@ import SwiftUI
 
 @main
 struct ReaderApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var tabsViewModel = TabsViewModel()
     @State private var hasOpenedDocument = false
 
     var body: some Scene {
         WindowGroup {
             MainContentView(tabsViewModel: tabsViewModel)
+                .handlesExternalEvents(preferring: Set(["*"]), allowing: Set(["*"]))
                 .onOpenURL { url in
                     Task { @MainActor in
                         await tabsViewModel.openDocument(from: url)
                         hasOpenedDocument = true
+                        closeDuplicateWindows()
                     }
                 }
                 .onAppear {
+                    appDelegate.tabsViewModel = tabsViewModel
+
+                    // Close duplicate windows - only allow one window
+                    closeDuplicateWindows()
+
                     // Hide window and show file picker on launch
                     if !tabsViewModel.hasOpenTabs {
                         if let window = NSApplication.shared.windows.first {
@@ -32,6 +40,7 @@ struct ReaderApp: App {
                     }
                 }
         }
+        .handlesExternalEvents(matching: Set(["*"]))
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
         .commands {
@@ -157,11 +166,51 @@ struct ReaderApp: App {
                 if let window = NSApplication.shared.windows.first {
                     window.makeKeyAndOrderFront(nil)
                 }
+                closeDuplicateWindows()
             }
         } else {
             // User cancelled - quit the app
             NSApplication.shared.terminate(nil)
         }
+    }
+
+    private func closeDuplicateWindows() {
+        let windows = NSApplication.shared.windows.filter { window in
+            // Filter to only app windows (not panels, sheets, etc.)
+            window.className == "SwiftUI.SwiftUIWindow" ||
+            window.className.contains("AppKitWindow")
+        }
+        guard windows.count > 1 else { return }
+
+        // Keep only the first window, close the rest
+        for window in windows.dropFirst() {
+            window.close()
+        }
+    }
+}
+
+// MARK: - App Delegate
+
+class AppDelegate: NSObject, NSApplicationDelegate {
+    var tabsViewModel: TabsViewModel?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Disable "New Window" menu item if it exists
+        DispatchQueue.main.async {
+            if let windowMenu = NSApplication.shared.mainMenu?.item(withTitle: "Window")?.submenu {
+                windowMenu.items.removeAll { $0.title == "New Window" }
+            }
+        }
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        // When user clicks dock icon with no visible windows, show the main window
+        if !flag {
+            if let window = sender.windows.first {
+                window.makeKeyAndOrderFront(nil)
+            }
+        }
+        return true
     }
 }
 

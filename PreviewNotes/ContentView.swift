@@ -88,17 +88,23 @@ struct MainContentView: View {
             // Focus the search field in sidebar
             showingSidebar = true
         }
-        .onChange(of: tabsViewModel.activeTabId) { newId in
+        .onChange(of: tabsViewModel.activeTabId) { [oldId = tabsViewModel.activeTabId] newId in
+            // Save current page position for the tab we're leaving
+            if let oldId = oldId,
+               let oldVM = tabsViewModel.viewModels[oldId],
+               let pdfView = pdfViewRef.pdfView,
+               let currentPDFPage = pdfView.currentPage,
+               let doc = pdfView.document {
+                oldVM.currentPageIndex = doc.index(for: currentPDFPage)
+            }
             // Reset state when switching tabs
-            // Note: Don't nil out pdfViewRef here - let updateNSView handle the reference
             clearSearch()
             // Sync zoom from the new active viewModel
             if let newId = newId, let vm = tabsViewModel.viewModels[newId] {
                 currentZoom = vm.zoomScale
-                // Also update the PDF view directly in case the view hasn't updated yet
-                DispatchQueue.main.async {
-                    pdfViewRef.pdfView?.scaleFactor = vm.zoomScale
-                    updatePageInfo()
+                // Restore page position after a brief delay to let the document load
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    restorePagePosition(for: vm)
                 }
             }
         }
@@ -130,9 +136,17 @@ struct MainContentView: View {
               let currentPDFPage = pdfView.currentPage else {
             return
         }
-        totalPages = document.pageCount
+        let newTotalPages = document.pageCount
         let pageIndex = document.index(for: currentPDFPage)
-        currentPage = pageIndex + 1
+        let newCurrentPage = pageIndex + 1
+
+        // Only update state if values actually changed to avoid unnecessary re-renders
+        if totalPages != newTotalPages {
+            totalPages = newTotalPages
+        }
+        if currentPage != newCurrentPage {
+            currentPage = newCurrentPage
+        }
     }
 
     private func syncZoomFromViewModel() {
@@ -314,6 +328,16 @@ struct MainContentView: View {
         currentSearchIndex = 0
         pdfViewRef.pdfView?.clearSelection()
     }
+
+    private func restorePagePosition(for viewModel: NotesViewModel) {
+        guard let doc = viewModel.getDocument(),
+              let page = doc.page(at: viewModel.currentPageIndex),
+              let pdfView = pdfViewRef.pdfView else {
+            return
+        }
+        pdfView.go(to: page)
+        updatePageInfo()
+    }
     
     // MARK: - Actions
     
@@ -476,6 +500,14 @@ struct PDFViewContainer: NSViewRepresentable {
     let onMultiLineHighlight: ([(page: PDFPage, bounds: CGRect)], String, NSColor) -> Void
     let onDeleteHighlight: (PDFAnnotation, PDFPage) -> Void
 
+    func makeCoordinator() -> Coordinator {
+        Coordinator(
+            onHighlightClicked: onHighlightClicked,
+            onMultiLineHighlight: onMultiLineHighlight,
+            onDeleteHighlight: onDeleteHighlight
+        )
+    }
+
     func makeNSView(context: Context) -> PDFView {
         let pdfView = HighlightablePDFView()
         pdfView.autoScales = false
@@ -484,37 +516,79 @@ struct PDFViewContainer: NSViewRepresentable {
         pdfView.document = document
         pdfView.scaleFactor = zoomScale
         pdfView.highlightColor = highlightColor
-        pdfView.onAnnotationClicked = { annotation, page in
+
+        // Use coordinator to avoid closure recreation on every update
+        let coordinator = context.coordinator
+        pdfView.onAnnotationClicked = { [weak coordinator] annotation, page in
             if annotation.type == "Highlight" {
-                onHighlightClicked(annotation, page)
+                coordinator?.onHighlightClicked(annotation, page)
             }
         }
-        pdfView.onMultiLineHighlight = onMultiLineHighlight
-        pdfView.onDeleteHighlight = onDeleteHighlight
+        pdfView.onMultiLineHighlight = { [weak coordinator] highlights, text, color in
+            coordinator?.onMultiLineHighlight(highlights, text, color)
+        }
+        pdfView.onDeleteHighlight = { [weak coordinator] annotation, page in
+            coordinator?.onDeleteHighlight(annotation, page)
+        }
 
         // Store reference immediately
         pdfViewRef.pdfView = pdfView
 
         return pdfView
     }
-    
+
     func updateNSView(_ pdfView: PDFView, context: Context) {
+        // Update coordinator callbacks (in case they change)
+        context.coordinator.onHighlightClicked = onHighlightClicked
+        context.coordinator.onMultiLineHighlight = onMultiLineHighlight
+        context.coordinator.onDeleteHighlight = onDeleteHighlight
+
+        // Only update document if it actually changed
         if pdfView.document !== document {
+            // Save current page before changing document
+            let currentPageIndex = pdfView.document.flatMap { doc in
+                pdfView.currentPage.map { doc.index(for: $0) }
+            }
+
             pdfView.document = document
+
+            // Restore page position if possible (same document reloaded)
+            if let pageIndex = currentPageIndex,
+               let page = document.page(at: pageIndex) {
+                pdfView.go(to: page)
+            }
         }
-        
-        // Update zoom when it changes
-        if abs(pdfView.scaleFactor - zoomScale) > 0.001 {
+
+        // Only update zoom when it actually changed significantly
+        if abs(pdfView.scaleFactor - zoomScale) > 0.01 {
             pdfView.scaleFactor = zoomScale
         }
-        
+
         if let highlightablePDF = pdfView as? HighlightablePDFView {
-            highlightablePDF.highlightColor = highlightColor
+            if highlightablePDF.highlightColor != highlightColor {
+                highlightablePDF.highlightColor = highlightColor
+            }
         }
-        
+
         // Keep reference updated
         if pdfViewRef.pdfView !== pdfView {
             pdfViewRef.pdfView = pdfView
+        }
+    }
+
+    class Coordinator {
+        var onHighlightClicked: (PDFAnnotation, PDFPage) -> Void
+        var onMultiLineHighlight: ([(page: PDFPage, bounds: CGRect)], String, NSColor) -> Void
+        var onDeleteHighlight: (PDFAnnotation, PDFPage) -> Void
+
+        init(
+            onHighlightClicked: @escaping (PDFAnnotation, PDFPage) -> Void,
+            onMultiLineHighlight: @escaping ([(page: PDFPage, bounds: CGRect)], String, NSColor) -> Void,
+            onDeleteHighlight: @escaping (PDFAnnotation, PDFPage) -> Void
+        ) {
+            self.onHighlightClicked = onHighlightClicked
+            self.onMultiLineHighlight = onMultiLineHighlight
+            self.onDeleteHighlight = onDeleteHighlight
         }
     }
 }

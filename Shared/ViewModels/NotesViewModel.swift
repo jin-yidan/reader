@@ -19,6 +19,8 @@ public class NotesViewModel: ObservableObject {
     @Published public private(set) var saveStatus: SaveStatus = .idle
     @Published public var zoomScale: CGFloat = 1.0
     @Published public var highlightColor: NSColor = .yellow
+    /// Tracks the current page index so it can be restored when switching tabs
+    public var currentPageIndex: Int = 0
 
     public enum SaveStatus: Equatable {
         case idle
