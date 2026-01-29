@@ -100,26 +100,19 @@ public class TabsViewModel: ObservableObject {
     }
 
     /// Rename a document using NSSavePanel for sandbox compatibility
-    public func renameDocument(tab: DocumentTab, to newName: String) {
+    public func renameDocument(tab: DocumentTab) {
         guard let index = tabs.firstIndex(where: { $0.id == tab.id }),
               let viewModel = viewModels[tab.id],
               let currentURL = viewModel.getDocumentURL() else {
             return
         }
 
-        // Sanitize the new name
-        let sanitizedName = newName
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: "/", with: "-")
-            .replacingOccurrences(of: "\\", with: "-")
-            .replacingOccurrences(of: ":", with: "-")
+        let currentName = currentURL.deletingPathExtension().lastPathComponent
 
-        guard !sanitizedName.isEmpty else { return }
-
-        // Show NSSavePanel for sandbox-compatible rename
+        // Show NSSavePanel for rename
         let savePanel = NSSavePanel()
         savePanel.allowedContentTypes = [.pdf]
-        savePanel.nameFieldStringValue = sanitizedName + ".pdf"
+        savePanel.nameFieldStringValue = currentName + ".pdf"
         savePanel.directoryURL = currentURL.deletingLastPathComponent()
         savePanel.title = "Rename Document"
         savePanel.prompt = "Rename"
@@ -137,6 +130,27 @@ public class TabsViewModel: ObservableObject {
                 updatedTab.updateAfterRename(newURL: newURL)
                 tabs[index] = updatedTab
             }
+        }
+    }
+
+    /// Save a document to a new location (keeps original)
+    public func saveDocumentAs(tab: DocumentTab) {
+        guard let viewModel = viewModels[tab.id],
+              let currentURL = viewModel.getDocumentURL() else {
+            return
+        }
+
+        let currentName = currentURL.deletingPathExtension().lastPathComponent
+
+        // Show NSSavePanel for save-as
+        let savePanel = NSSavePanel()
+        savePanel.allowedContentTypes = [.pdf]
+        savePanel.nameFieldStringValue = currentName + ".pdf"
+        savePanel.title = "Save Document As"
+        savePanel.prompt = "Save"
+
+        if savePanel.runModal() == .OK, let newURL = savePanel.url {
+            _ = viewModel.saveDocumentAs(to: newURL)
         }
     }
 }

@@ -25,8 +25,11 @@ public struct TabBarView: View {
                             tabsViewModel.closeTab(tab)
                         }
                     },
-                    onRename: { newName in
-                        tabsViewModel.renameDocument(tab: tab, to: newName)
+                    onRename: {
+                        tabsViewModel.renameDocument(tab: tab)
+                    },
+                    onSaveTo: {
+                        tabsViewModel.saveDocumentAs(tab: tab)
                     }
                 )
                 .opacity(draggingTab?.id == tab.id ? 0.5 : 1.0)
@@ -81,33 +84,22 @@ struct TabDropDelegate: DropDelegate {
     }
 }
 
-/// Individual tab item with double-click to rename
+/// Individual tab item with right-click context menu for rename/save
 struct TabItemView: View {
     let tab: DocumentTab
     let isActive: Bool
     let hasUnsavedChanges: Bool
     let onSelect: () -> Void
     let onClose: () -> Void
-    let onRename: (String) -> Void
+    let onRename: () -> Void
+    let onSaveTo: () -> Void
 
     @State private var isHovering = false
-    @State private var isEditing = false
-    @State private var editingName = ""
-    @FocusState private var isTextFieldFocused: Bool
 
     var body: some View {
         ZStack {
-            // Background - responds to taps
+            // Background
             tabBackground
-                .contentShape(Rectangle())
-                .onTapGesture(count: 2) {
-                    startEditing()
-                }
-                .onTapGesture(count: 1) {
-                    if !isEditing {
-                        onSelect()
-                    }
-                }
 
             // Content
             HStack(spacing: 8) {
@@ -115,38 +107,23 @@ struct TabItemView: View {
                     .font(.system(size: 12))
                     .foregroundColor(isActive ? .accentColor : .secondary)
 
-                if isEditing {
-                    // Editable text field
-                    TextField("", text: $editingName)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 12, weight: isActive ? .medium : .regular))
-                        .foregroundColor(.primary)
-                        .focused($isTextFieldFocused)
-                        .onSubmit {
-                            commitRename()
-                        }
-                        .onExitCommand {
-                            cancelRename()
-                        }
-                } else {
-                    // Display title with unsaved indicator
-                    HStack(spacing: 4) {
-                        if hasUnsavedChanges {
-                            Circle()
-                                .fill(Color.primary.opacity(0.6))
-                                .frame(width: 6, height: 6)
-                        }
-                        Text(tab.title)
-                            .font(.system(size: 12, weight: isActive ? .medium : .regular))
-                            .foregroundColor(isActive ? .primary : .secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
+                // Display title with unsaved indicator
+                HStack(spacing: 4) {
+                    if hasUnsavedChanges {
+                        Circle()
+                            .fill(Color.primary.opacity(0.6))
+                            .frame(width: 6, height: 6)
                     }
+                    Text(tab.title)
+                        .font(.system(size: 12, weight: isActive ? .medium : .regular))
+                        .foregroundColor(isActive ? .primary : .secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                 }
 
                 Spacer(minLength: 4)
 
-                // Close button - outside the tap gesture area
+                // Close button
                 closeButton
             }
             .padding(.horizontal, 12)
@@ -154,14 +131,34 @@ struct TabItemView: View {
         }
         .frame(maxWidth: .infinity)
         .overlay(tabBorder)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onSelect()
+        }
+        .contextMenu {
+            Button {
+                onRename()
+            } label: {
+                Label("Rename...", systemImage: "pencil")
+            }
+
+            Button {
+                onSaveTo()
+            } label: {
+                Label("Save to...", systemImage: "square.and.arrow.down")
+            }
+
+            Divider()
+
+            Button(role: .destructive) {
+                onClose()
+            } label: {
+                Label("Close", systemImage: "xmark")
+            }
+        }
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.1)) {
                 isHovering = hovering
-            }
-        }
-        .onChange(of: isTextFieldFocused) { focused in
-            if !focused && isEditing {
-                commitRename()
             }
         }
         .animation(.easeInOut(duration: 0.15), value: isActive)
@@ -201,26 +198,6 @@ struct TabItemView: View {
                     .frame(height: 2)
             }
         }
-    }
-
-    private func startEditing() {
-        // Extract just the filename without extension
-        let filename = tab.url?.deletingPathExtension().lastPathComponent ?? tab.title
-        editingName = filename
-        isEditing = true
-        isTextFieldFocused = true
-    }
-
-    private func commitRename() {
-        let trimmedName = editingName.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedName.isEmpty && trimmedName != tab.title {
-            onRename(trimmedName)
-        }
-        isEditing = false
-    }
-
-    private func cancelRename() {
-        isEditing = false
     }
 }
 
