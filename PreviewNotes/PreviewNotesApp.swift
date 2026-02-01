@@ -24,12 +24,19 @@ struct ReaderApp: App {
                     closeDuplicateWindows()
 
                     // Hide window and show file picker on launch
+                    // Use a small delay to allow .onOpenURL to fire first when app is launched by opening a file
                     if !tabsViewModel.hasOpenTabs {
                         if let window = NSApplication.shared.windows.first {
                             window.orderOut(nil)
                         }
-                        DispatchQueue.main.async {
-                            self.openDocumentOrQuit()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            // Check again - .onOpenURL may have opened a document
+                            if !tabsViewModel.hasOpenTabs && !hasOpenedDocument {
+                                self.openDocumentOrQuit()
+                            } else if let window = NSApplication.shared.windows.first {
+                                // Document was opened via .onOpenURL, show the window
+                                window.makeKeyAndOrderFront(nil)
+                            }
                         }
                     }
                 }
