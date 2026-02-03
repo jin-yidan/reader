@@ -102,20 +102,9 @@ struct MainContentView: View {
             // Sync zoom from the new active viewModel
             if let newId = newId, let vm = tabsViewModel.viewModels[newId] {
                 currentZoom = vm.zoomScale
-                // Restore page position after SwiftUI view update cycle completes
-                // Using slightly longer delay (100ms) to ensure document is fully loaded
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak pdfViewRef] in
-                    // Verify the document is loaded before restoring
-                    guard pdfViewRef?.pdfView?.document != nil else {
-                        // Retry once more after another delay if document not ready
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            self.restorePagePosition(for: vm)
-                        }
-                        return
-                    }
-                    self.restorePagePosition(for: vm)
-                }
             }
+            // Note: Page restoration is handled in PDFViewContainer.updateNSView
+            // when the document changes, using the viewModel's currentPageIndex
         }
         .onReceive(NotificationCenter.default.publisher(for: .zoomChanged)) { notification in
             // Sync zoom when it changes from keyboard shortcuts
@@ -174,6 +163,7 @@ struct MainContentView: View {
                 pdfViewRef: pdfViewRef,
                 zoomScale: currentZoom,
                 highlightColor: viewModel.highlightColor,
+                pageIndex: viewModel.currentPageIndex,
                 onHighlightClicked: handleHighlightClicked,
                 onMultiLineHighlight: handleMultiLineHighlight,
                 onDeleteHighlight: handleDeleteHighlight
@@ -505,6 +495,7 @@ struct PDFViewContainer: NSViewRepresentable {
     let pdfViewRef: PDFViewReference
     let zoomScale: CGFloat
     let highlightColor: NSColor
+    let pageIndex: Int  // Page to restore when document changes
     let onHighlightClicked: (PDFAnnotation, PDFPage) -> Void
     let onMultiLineHighlight: ([(page: PDFPage, bounds: CGRect)], String, NSColor) -> Void
     let onDeleteHighlight: (PDFAnnotation, PDFPage) -> Void
@@ -555,9 +546,10 @@ struct PDFViewContainer: NSViewRepresentable {
         // Only update document if it actually changed
         if pdfView.document !== document {
             pdfView.document = document
-            // Note: Page restoration is handled by restorePagePosition() in onChange(of: activeTabId)
-            // We don't restore here because when switching tabs, the old page index is meaningless
-            // for the new document
+            // Restore page position immediately after setting document
+            if let page = document.page(at: pageIndex) {
+                pdfView.go(to: page)
+            }
         }
 
         // Only update zoom when it actually changed significantly
