@@ -102,9 +102,18 @@ struct MainContentView: View {
             // Sync zoom from the new active viewModel
             if let newId = newId, let vm = tabsViewModel.viewModels[newId] {
                 currentZoom = vm.zoomScale
-                // Restore page position after a brief delay to let the document load
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    restorePagePosition(for: vm)
+                // Restore page position after SwiftUI view update cycle completes
+                // Using slightly longer delay (100ms) to ensure document is fully loaded
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak pdfViewRef] in
+                    // Verify the document is loaded before restoring
+                    guard pdfViewRef?.pdfView?.document != nil else {
+                        // Retry once more after another delay if document not ready
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            self.restorePagePosition(for: vm)
+                        }
+                        return
+                    }
+                    self.restorePagePosition(for: vm)
                 }
             }
         }
@@ -545,18 +554,10 @@ struct PDFViewContainer: NSViewRepresentable {
 
         // Only update document if it actually changed
         if pdfView.document !== document {
-            // Save current page before changing document
-            let currentPageIndex = pdfView.document.flatMap { doc in
-                pdfView.currentPage.map { doc.index(for: $0) }
-            }
-
             pdfView.document = document
-
-            // Restore page position if possible (same document reloaded)
-            if let pageIndex = currentPageIndex,
-               let page = document.page(at: pageIndex) {
-                pdfView.go(to: page)
-            }
+            // Note: Page restoration is handled by restorePagePosition() in onChange(of: activeTabId)
+            // We don't restore here because when switching tabs, the old page index is meaningless
+            // for the new document
         }
 
         // Only update zoom when it actually changed significantly

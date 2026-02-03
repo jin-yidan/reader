@@ -40,12 +40,14 @@ public class NotesViewModel: ObservableObject {
     private var isSaveInProgress = false
     private var pendingSave = false
     private var pendingAutosaveTask: Task<Void, Never>?
+    private var temporaryFiles: [URL] = []
 
     /// Index for fast note lookup by page and bounds
     private var noteIndex: [String: NoteAnnotation] = [:]
 
     private func noteKey(pageIndex: Int, bounds: CGRect) -> String {
-        "\(pageIndex)_\(Int(bounds.origin.x))_\(Int(bounds.origin.y))_\(Int(bounds.width))_\(Int(bounds.height))"
+        // Use rounded values to avoid floating-point truncation issues
+        "\(pageIndex)_\(Int(bounds.origin.x.rounded()))_\(Int(bounds.origin.y.rounded()))_\(Int(bounds.width.rounded()))_\(Int(bounds.height.rounded()))"
     }
 
     private func rebuildNoteIndex() {
@@ -113,10 +115,10 @@ public class NotesViewModel: ObservableObject {
     }
     
     // MARK: - Initialization
-    
+
     public init(annotationService: PDFAnnotationService = PDFAnnotationService()) {
         self.annotationService = annotationService
-        setupAutosave()
+        // Note: autosave is set up when document is loaded, not on init
     }
     
     deinit {
@@ -125,14 +127,21 @@ public class NotesViewModel: ObservableObject {
         if hasSecurityScopedAccess, let url = documentURL {
             url.stopAccessingSecurityScopedResource()
         }
+        // Clean up any temporary files
+        for tempFile in temporaryFiles {
+            try? FileManager.default.removeItem(at: tempFile)
+        }
     }
     
     // MARK: - Autosave
-    
+
     private func setupAutosave() {
+        // Prevent duplicate timers
+        guard autosaveTimer == nil else { return }
+
         // Autosave every 30 seconds if there are unsaved changes
         autosaveTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
+            Task { @MainActor in
                 self?.autosave()
             }
         }
@@ -193,6 +202,9 @@ public class NotesViewModel: ObservableObject {
             self.rebuildNoteIndex()
             self.hasUnsavedChanges = false
 
+            // Setup autosave now that we have a document
+            setupAutosave()
+
             isLoading = false
         } catch let notesError as NotesError {
             self.error = notesError.localizedDescription
@@ -210,6 +222,7 @@ public class NotesViewModel: ObservableObject {
         self.notes = annotationService.extractNotesFromDocument(document)
         self.rebuildNoteIndex()
         self.hasUnsavedChanges = false
+        setupAutosave()
     }
     
     /// Refresh notes from the current document
@@ -285,8 +298,8 @@ public class NotesViewModel: ObservableObject {
 
     /// Add a note entry for an existing highlight (when user clicks on highlight to add note)
     public func addHighlightNote(pageIndex: Int, bounds: CGRect, text: String, color: NSColor) {
-        // Check if note already exists
-        if notes.contains(where: { $0.pageIndex == pageIndex && $0.bounds == bounds }) {
+        // Check if note already exists (using tolerance for floating-point comparison)
+        if notes.contains(where: { $0.pageIndex == pageIndex && boundsMatch($0.bounds, bounds) }) {
             return
         }
         
@@ -328,10 +341,10 @@ public class NotesViewModel: ObservableObject {
         var updatedNote = note
         updatedNote.noteText = newText
         
-        // Update the annotation contents
+        // Update the annotation contents (using tolerance for floating-point comparison)
         if let page = document.page(at: note.pageIndex) {
             for annotation in page.annotations {
-                if annotation.type == "Highlight" && annotation.bounds == note.bounds {
+                if annotation.type == "Highlight" && boundsMatch(annotation.bounds, note.bounds) {
                     annotation.contents = newText
                     break
                 }
@@ -439,31 +452,41 @@ public class NotesViewModel: ObservableObject {
             return
         }
 
+        // Capture URL value to avoid capturing self in detached task
+        let saveURL = url
+
         // Write on background thread to avoid blocking UI
-        Task.detached(priority: .utility) { [weak self] in
-            var success = false
-            var saveError: String?
-
-            let coordinator = NSFileCoordinator(filePresenter: nil)
-            var coordinatorError: NSError?
-
-            coordinator.coordinate(writingItemAt: url, options: .forReplacing, error: &coordinatorError) { newURL in
-                do {
-                    try documentData.write(to: newURL, options: .atomic)
-                    success = true
-                } catch let writeError {
-                    saveError = writeError.localizedDescription
-                }
-            }
-
-            if let coordinatorError = coordinatorError {
-                saveError = coordinatorError.localizedDescription
-            }
+        Task.detached(priority: .utility) {
+            let result = Self.performSave(data: documentData, to: saveURL)
 
             await MainActor.run { [weak self] in
-                self?.handleSaveCompletion(succeeded: success, errorMessage: saveError)
+                self?.handleSaveCompletion(succeeded: result.success, errorMessage: result.error)
             }
         }
+    }
+
+    /// Perform the actual file save (thread-safe, no instance state access)
+    private nonisolated static func performSave(data: Data, to url: URL) -> (success: Bool, error: String?) {
+        var success = false
+        var saveError: String?
+
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        var coordinatorError: NSError?
+
+        coordinator.coordinate(writingItemAt: url, options: .forReplacing, error: &coordinatorError) { newURL in
+            do {
+                try data.write(to: newURL, options: .atomic)
+                success = true
+            } catch let writeError {
+                saveError = writeError.localizedDescription
+            }
+        }
+
+        if let coordinatorError = coordinatorError {
+            saveError = coordinatorError.localizedDescription
+        }
+
+        return (success, saveError)
     }
 
     /// Handle save completion (called on main actor after background save)
@@ -522,9 +545,17 @@ public class NotesViewModel: ObservableObject {
         // Write to new location
         let success = doc.write(to: newURL)
         if success {
+            // Stop access to old URL if we had security-scoped access
+            if hasSecurityScopedAccess, let oldURL = documentURL {
+                oldURL.stopAccessingSecurityScopedResource()
+            }
+
             // Update internal references
             documentURL = newURL
-            _ = newURL.startAccessingSecurityScopedResource()
+
+            // Start access to new URL and track it
+            let didStartAccess = newURL.startAccessingSecurityScopedResource()
+            hasSecurityScopedAccess = didStartAccess
 
             // Reload from new location
             if let newDocument = PDFDocument(url: newURL) {
@@ -589,8 +620,9 @@ public class NotesViewModel: ObservableObject {
             // Update the URL reference
             documentURL = newURL
 
-            // Start accessing the new URL
-            _ = newURL.startAccessingSecurityScopedResource()
+            // Start accessing the new URL and track it
+            let didStartAccess = newURL.startAccessingSecurityScopedResource()
+            hasSecurityScopedAccess = didStartAccess
 
             // Reload from new location
             if let newDocument = PDFDocument(url: newURL) {
@@ -720,7 +752,11 @@ public class NotesViewModel: ObservableObject {
 
         if savePanel.runModal() == .OK, let url = savePanel.url {
             let content = generateNotesMarkdown()
-            try? content.write(to: url, atomically: true, encoding: .utf8)
+            do {
+                try content.write(to: url, atomically: true, encoding: .utf8)
+            } catch {
+                self.error = "Failed to export notes: \(error.localizedDescription)"
+            }
         }
     }
 
@@ -730,14 +766,26 @@ public class NotesViewModel: ObservableObject {
 
         let content = generateNotesMarkdown()
         let tempDir = FileManager.default.temporaryDirectory
-        let fileURL = tempDir.appendingPathComponent("\(documentTitle)-notes.md")
+        // Use unique filename to avoid collisions
+        let fileURL = tempDir.appendingPathComponent("\(documentTitle)-notes-\(UUID().uuidString.prefix(8)).md")
 
         do {
             try content.write(to: fileURL, atomically: true, encoding: .utf8)
+            // Track for cleanup
+            temporaryFiles.append(fileURL)
             return fileURL
         } catch {
+            self.error = "Failed to create shareable file: \(error.localizedDescription)"
             return nil
         }
+    }
+
+    /// Clean up temporary files (call after sharing is complete)
+    public func cleanupTemporaryFiles() {
+        for tempFile in temporaryFiles {
+            try? FileManager.default.removeItem(at: tempFile)
+        }
+        temporaryFiles.removeAll()
     }
 
     /// Get items for sharing (just the PDF file with original name)

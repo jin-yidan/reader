@@ -251,9 +251,9 @@ public class PDFAnnotationService {
             }
         }
 
-        // Finally, try to match by bounds
+        // Finally, try to match by bounds (with tolerance for floating-point precision)
         for annotation in page.annotations {
-            if annotation.type == "Highlight" && annotation.bounds == note.bounds {
+            if annotation.type == "Highlight" && boundsMatch(annotation.bounds, note.bounds) {
                 return annotation
             }
         }
@@ -290,9 +290,20 @@ public class PDFAnnotationService {
               let highlight = findHighlightAnnotation(matching: note, on: page) else {
             return false
         }
-        
+
         page.removeAnnotation(highlight)
         return true
+    }
+
+    // MARK: - Helpers
+
+    /// Compare bounds with tolerance for floating-point precision
+    private func boundsMatch(_ a: CGRect, _ b: CGRect) -> Bool {
+        let tolerance: CGFloat = 2.0
+        return abs(a.origin.x - b.origin.x) < tolerance &&
+               abs(a.origin.y - b.origin.y) < tolerance &&
+               abs(a.width - b.width) < tolerance &&
+               abs(a.height - b.height) < tolerance
     }
 }
 
