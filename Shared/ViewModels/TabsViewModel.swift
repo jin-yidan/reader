@@ -37,8 +37,9 @@ public class TabsViewModel: ObservableObject {
     
     /// Open a new document in a new tab
     public func openDocument(from url: URL) async {
-        // Check if document is already open
-        if let existingTab = tabs.first(where: { $0.url == url }) {
+        // Check if document is already open (use standardized URLs for comparison)
+        let standardizedURL = url.standardizedFileURL
+        if let existingTab = tabs.first(where: { $0.url?.standardizedFileURL == standardizedURL }) {
             activeTabId = existingTab.id
             return
         }
