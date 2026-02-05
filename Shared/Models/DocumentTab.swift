@@ -20,7 +20,7 @@ public struct DocumentTab: Identifiable, Equatable {
     }
 
     public static func == (lhs: DocumentTab, rhs: DocumentTab) -> Bool {
-        lhs.id == rhs.id
+        lhs.id == rhs.id && lhs.url == rhs.url && lhs.title == rhs.title
     }
 }
 
