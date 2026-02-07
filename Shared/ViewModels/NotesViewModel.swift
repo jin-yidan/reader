@@ -159,7 +159,7 @@ public class NotesViewModel: ObservableObject {
     
     private func autosave() {
         if hasUnsavedChanges {
-            saveDocument()
+            scheduleAutosave()
         }
     }
     

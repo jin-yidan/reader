@@ -989,7 +989,9 @@ enum TerminologyGlossary {
 
 // MARK: - Translation Popover View
 
+#if canImport(Translation)
 import Translation
+#endif
 
 struct TranslationPopoverView: View {
     let originalText: String
@@ -1098,6 +1100,7 @@ struct AppleTranslationModifier: ViewModifier {
     @Binding var shouldTranslate: Bool
 
     func body(content: Content) -> some View {
+        #if canImport(Translation)
         if #available(macOS 15.0, *) {
             content
                 .translationTask(shouldTranslate ? .init(source: Locale.Language(identifier: "en"), target: Locale.Language(identifier: "zh-Hans")) : nil, action: { session in
@@ -1131,6 +1134,15 @@ struct AppleTranslationModifier: ViewModifier {
                     }
                 }
         }
+        #else
+        content
+            .onChange(of: shouldTranslate) { newValue in
+                if newValue {
+                    translatedText = "Requires macOS 15.0+ (Translation framework unavailable)"
+                    isLoading = false
+                }
+            }
+        #endif
     }
 }
 

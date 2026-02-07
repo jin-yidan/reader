@@ -88,21 +88,14 @@ struct MainContentView: View {
             // Focus the search field in sidebar
             showingSidebar = true
         }
-        .onChange(of: tabsViewModel.activeTabId) { [oldId = tabsViewModel.activeTabId] newId in
-            // Save current page position for the tab we're leaving
-            if let oldId = oldId,
-               let oldVM = tabsViewModel.viewModels[oldId],
-               let pdfView = pdfViewRef.pdfView,
-               let currentPDFPage = pdfView.currentPage,
-               let doc = pdfView.document {
-                oldVM.currentPageIndex = doc.index(for: currentPDFPage)
-            }
+        .onChange(of: tabsViewModel.activeTabId) { newId in
             // Reset state when switching tabs
             clearSearch()
             // Sync zoom from the new active viewModel
             if let newId = newId, let vm = tabsViewModel.viewModels[newId] {
                 currentZoom = vm.zoomScale
             }
+            updatePageInfo()
             // Note: Page restoration is handled in PDFViewContainer.updateNSView
             // when the document changes, using the viewModel's currentPageIndex
         }
@@ -131,6 +124,8 @@ struct MainContentView: View {
     private func updatePageInfo() {
         guard let pdfView = pdfViewRef.pdfView,
               let document = pdfView.document,
+              let activeDocument = activeViewModel?.getDocument(),
+              document === activeDocument,
               let currentPDFPage = pdfView.currentPage else {
             return
         }
@@ -145,6 +140,7 @@ struct MainContentView: View {
         if currentPage != newCurrentPage {
             currentPage = newCurrentPage
         }
+        activeViewModel?.currentPageIndex = pageIndex
     }
 
     private func syncZoomFromViewModel() {

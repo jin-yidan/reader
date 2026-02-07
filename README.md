@@ -49,6 +49,7 @@ Open multiple papers in tabs, just like a browser.
 - macOS 13.0+ for basic features
 - macOS 15.0+ for translation
 - Xcode 15.0+ to build from source
+- Translation feature builds require Xcode 16.0+ (macOS 15 SDK)
 
 ## How to Use
 
