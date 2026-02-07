@@ -79,6 +79,17 @@ struct MainContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name.PDFViewPageChanged)) { notification in
             updatePageInfo()
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name.PDFViewScaleChanged)) { notification in
+            guard let pdfView = notification.object as? PDFView,
+                  pdfView === pdfViewRef.pdfView else {
+                return
+            }
+            let newScale = pdfView.scaleFactor
+            if abs(currentZoom - newScale) > 0.001 {
+                currentZoom = newScale
+                activeViewModel?.zoomScale = newScale
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .toggleSidebar)) { _ in
             withAnimation(.easeInOut(duration: 0.2)) {
                 showingSidebar.toggle()
@@ -237,7 +248,7 @@ struct MainContentView: View {
                 Button(action: zoomIn) {
                     Image(systemName: "plus.magnifyingglass")
                 }
-                .disabled(currentZoom >= (NotesViewModel.zoomPresets.last ?? 2.0))
+                .disabled(currentZoom >= (NotesViewModel.zoomPresets.last ?? 4.0))
                 .help("Zoom In (⌘+)")
                 .accessibilityLabel("Zoom in")
 
@@ -506,11 +517,15 @@ struct PDFViewContainer: NSViewRepresentable {
 
     func makeNSView(context: Context) -> PDFView {
         let pdfView = HighlightablePDFView()
+        let minScale = NotesViewModel.zoomPresets.first ?? 0.5
+        let maxScale = NotesViewModel.zoomPresets.last ?? 4.0
         pdfView.autoScales = false
         pdfView.displayMode = .singlePageContinuous
         pdfView.displayDirection = .vertical
+        pdfView.minScaleFactor = minScale
+        pdfView.maxScaleFactor = maxScale
         pdfView.document = document
-        pdfView.scaleFactor = zoomScale
+        pdfView.scaleFactor = min(max(zoomScale, minScale), maxScale)
         pdfView.highlightColor = highlightColor
 
         // Use coordinator to avoid closure recreation on every update
@@ -534,6 +549,8 @@ struct PDFViewContainer: NSViewRepresentable {
     }
 
     func updateNSView(_ pdfView: PDFView, context: Context) {
+        let minScale = NotesViewModel.zoomPresets.first ?? 0.5
+        let maxScale = NotesViewModel.zoomPresets.last ?? 4.0
         // Update coordinator callbacks (in case they change)
         context.coordinator.onHighlightClicked = onHighlightClicked
         context.coordinator.onMultiLineHighlight = onMultiLineHighlight
@@ -549,8 +566,15 @@ struct PDFViewContainer: NSViewRepresentable {
         }
 
         // Only update zoom when it actually changed significantly
-        if abs(pdfView.scaleFactor - zoomScale) > 0.01 {
-            pdfView.scaleFactor = zoomScale
+        let clampedZoom = min(max(zoomScale, minScale), maxScale)
+        if pdfView.minScaleFactor != minScale {
+            pdfView.minScaleFactor = minScale
+        }
+        if pdfView.maxScaleFactor != maxScale {
+            pdfView.maxScaleFactor = maxScale
+        }
+        if abs(pdfView.scaleFactor - clampedZoom) > 0.01 {
+            pdfView.scaleFactor = clampedZoom
         }
 
         if let highlightablePDF = pdfView as? HighlightablePDFView {

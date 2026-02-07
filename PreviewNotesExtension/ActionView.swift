@@ -51,6 +51,17 @@ struct ActionView: View {
                 pdfViewRef.pdfView?.scaleFactor = newZoom
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name.PDFViewScaleChanged)) { notification in
+            guard let pdfView = notification.object as? PDFView,
+                  pdfView === pdfViewRef.pdfView else {
+                return
+            }
+            let newScale = pdfView.scaleFactor
+            if abs(currentZoom - newScale) > 0.001 {
+                currentZoom = newScale
+                viewModel.zoomScale = newScale
+            }
+        }
     }
     
     // MARK: - Header Bar
@@ -273,11 +284,15 @@ struct ExtensionPDFViewContainer: NSViewRepresentable {
 
     func makeNSView(context: Context) -> PDFView {
         let pdfView = HighlightablePDFView()
+        let minScale = NotesViewModel.zoomPresets.first ?? 0.5
+        let maxScale = NotesViewModel.zoomPresets.last ?? 4.0
         pdfView.autoScales = false
         pdfView.displayMode = .singlePageContinuous
         pdfView.displayDirection = .vertical
+        pdfView.minScaleFactor = minScale
+        pdfView.maxScaleFactor = maxScale
         pdfView.document = document
-        pdfView.scaleFactor = zoomScale
+        pdfView.scaleFactor = min(max(zoomScale, minScale), maxScale)
         pdfView.highlightColor = highlightColor
         pdfView.onAnnotationClicked = { annotation, page in
             if annotation.type == "Highlight" {
@@ -293,13 +308,22 @@ struct ExtensionPDFViewContainer: NSViewRepresentable {
     }
     
     func updateNSView(_ pdfView: PDFView, context: Context) {
+        let minScale = NotesViewModel.zoomPresets.first ?? 0.5
+        let maxScale = NotesViewModel.zoomPresets.last ?? 4.0
         if pdfView.document !== document {
             pdfView.document = document
         }
         
         // Update zoom when it changes
-        if abs(pdfView.scaleFactor - zoomScale) > 0.001 {
-            pdfView.scaleFactor = zoomScale
+        let clampedZoom = min(max(zoomScale, minScale), maxScale)
+        if pdfView.minScaleFactor != minScale {
+            pdfView.minScaleFactor = minScale
+        }
+        if pdfView.maxScaleFactor != maxScale {
+            pdfView.maxScaleFactor = maxScale
+        }
+        if abs(pdfView.scaleFactor - clampedZoom) > 0.001 {
+            pdfView.scaleFactor = clampedZoom
         }
         
         if let highlightablePDF = pdfView as? HighlightablePDFView {
